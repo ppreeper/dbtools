@@ -1,0 +1,13 @@
+kind: pipeline
+type: docker
+name: default
+
+steps:
+  - name: build
+    image: golang:1.17
+    commands:
+      - go build -v ./...
+  - name: test
+    image: golang:1.17
+    commands:
+      - go test -cover -covermode=atomic -coverprofile=coverage.out -race -v ./...
