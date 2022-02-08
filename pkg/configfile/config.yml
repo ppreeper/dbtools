@@ -1,0 +1,22 @@
+databases:
+  - name: postgresql_example
+    driver: postgres
+    host: postgresql.example.com
+    port: 5432
+    database: pgdb
+    username: postgres
+    password: password
+  - name: pgx_example
+    driver: pgx
+    host: postgresql.example.com
+    port: 5432
+    database: pgdb
+    username: postgres
+    password: password
+  - name: mssql_schema
+    driver: mssql
+    host: sqlserver.example.com
+    port: 1433
+    database: mssql
+    username: sa
+    password: password
