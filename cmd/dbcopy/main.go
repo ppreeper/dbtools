@@ -13,6 +13,7 @@ import (
 
 	"github.com/ppreeper/dbtools/pkg/configfile"
 	"github.com/ppreeper/dbtools/pkg/database"
+	"github.com/ppreeper/pad"
 	"github.com/schollz/progressbar/v3"
 
 	"go.uber.org/zap"
@@ -65,23 +66,11 @@ type Config struct {
 	Timeout     int
 	Update      bool
 	All         bool
+	LogFile     string
 }
 
 func main() {
-	logName := "dbcopy.log"
-	_, err := os.Stat(logName)
-	if os.IsNotExist(err) {
-		file, err := os.Create(logName)
-		ec.FatalErr(err)
-		defer file.Close()
-	}
-	err = os.Truncate(logName, 0)
-	ec.CheckErr(err)
-	cfg := zap.NewProductionConfig()
-	cfg.OutputPaths = []string{logName}
-	logger, _ := cfg.Build()
-	log = logger.Sugar()
-
+	// init config struct
 	config := Config{
 		JobCount: 8,
 	}
@@ -114,29 +103,50 @@ func main() {
 	flag.BoolVar(&config.Debug, "n", false, "no-op debug")
 	flag.IntVar(&config.JobCount, "j", 8, "job count")
 	flag.IntVar(&config.Timeout, "timeout", 10, "query timeout")
+	flag.StringVar(&config.LogFile, "logfile", "dbcopy.log", "log file")
 
 	flag.Parse()
-
-	log.Infow("start", "config", config)
-
-	fmt.Println("Source: ", config.Source, "SSchemaName: ", config.SSchemaName, "Dest: ", config.Dest, "DSchemaName: ", config.DSchemaName)
-	fmt.Println("Table: ", config.Table, "TableName: ", config.TableName)
-	fmt.Println("View: ", config.View, "ViewName: ", config.ViewName)
-	fmt.Println("Routine: ", config.Routine, "RoutineName: ", config.RoutineName)
-	fmt.Println("Index: ", config.Index, "IndexName: ", config.IndexName)
-	fmt.Println("All: ", config.All, "Link: ", config.Link, "Update: ", config.Update, "Debug: ", config.Debug)
-
-	config.Filter = regexp.MustCompilePOSIX(config.FilterDef)
 
 	// Config File
 	userConfigDir, err := os.UserConfigDir()
 	ec.CheckErr(err)
+	userDir, err := os.UserHomeDir()
+	ec.CheckErr(err)
 	var c configfile.Conf
 	c.GetConf(userConfigDir + "/dbtools/config.yml")
 
-	src,err := c.GetDB(config.Source)
+	// logging
+	logName := userDir + "/" + config.LogFile
+	_, err = os.Stat(logName)
+	if os.IsNotExist(err) {
+		file, err := os.Create(logName)
+		ec.FatalErr(err)
+		defer file.Close()
+	}
+	err = os.Truncate(logName, 0)
+	ec.CheckErr(err)
+	cfg := zap.NewProductionConfig()
+	cfg.OutputPaths = []string{logName}
+	logger, _ := cfg.Build()
+	log = logger.Sugar()
+
+	// config options display
+	log.Infow("start", "config", config)
+
+	fmt.Println(pad.RJustLen("Source:", 8), pad.LJustLen(config.Source, 20), pad.RJustLen("SSchemaName:", 13), pad.LJustLen(config.SSchemaName, 20))
+	fmt.Println(pad.RJustLen("Dest:", 8), pad.LJustLen(config.Dest, 20), pad.RJustLen("DSchemaName:", 13), pad.LJustLen(config.DSchemaName, 20))
+	fmt.Println(pad.RJustLen("Table:", 8), config.Table, pad.RJustLen("TableName:", 13), config.TableName)
+	fmt.Println(pad.RJustLen("View:", 8), config.View, pad.RJustLen("ViewName:", 13), config.ViewName)
+	fmt.Println(pad.RJustLen("Routine:", 8), config.Routine, pad.RJustLen("RoutineName:", 13), config.RoutineName)
+	fmt.Println(pad.RJustLen("Index:", 8), config.Index, pad.RJustLen("IndexName:", 13), config.IndexName)
+	fmt.Println(pad.RJustLen("All:", 8), config.All, pad.RJustLen("Link:", 8), config.Link, pad.RJustLen("Update:", 8), config.Update, pad.RJustLen("Debug:", 8), config.Debug)
+
+	config.Filter = regexp.MustCompilePOSIX(config.FilterDef)
+
+	// get database connections
+	src, err := c.GetDB(config.Source)
 	ec.FatalErr(err)
-	dst,err := c.GetDB(config.Dest)
+	dst, err := c.GetDB(config.Dest)
 	ec.FatalErr(err)
 
 	//////////
