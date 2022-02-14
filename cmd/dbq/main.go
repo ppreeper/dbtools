@@ -118,23 +118,17 @@ func printData(colNames *[]string, dataSet *[]interface{}) {
 		for k, c := range *colNames {
 			val := v.(map[string]interface{})[c]
 			vs := ""
-			// fmt.Println(val.(type), val)
-			switch vt := val.(type) {
-			// case string:
-			// 	fmt.Println("val is string:", valType)
-			// 	vs = fmt.Sprintf("%s", val)
-			// case float64:
-			// 	fmt.Println("val is float64")
-			// 	vs = fmt.Sprintf("%f", val)
+			switch val.(type) {
+			case string:
+				vs = fmt.Sprintf("%s", val)
+			case float64:
+				vs = fmt.Sprintf("%f", val)
 			default:
-				fmt.Println("val is type: ", vt)
+				vs = fmt.Sprintf("%v", val)
 			}
-			// vs := fmt.Sprintf("%s", v.(map[string]interface{})[c])
-			// fmt.Printf("%v", pad.LJustLen(vs, colLens[k]))
 			line += pad.LJustLen(vs, colLens[k])
 			if k < len(*colNames)-1 {
 				line += ";"
-				// fmt.Printf(";")
 			}
 		}
 		fmt.Println(line)
