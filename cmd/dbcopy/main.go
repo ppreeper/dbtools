@@ -132,7 +132,7 @@ func main() {
 	userConfigDir, err := os.UserConfigDir()
 	ec.CheckErr(err)
 	var c configfile.Conf
-	c.GetConf(userConfigDir + "/db_copy/config.yml")
+	c.GetConf(userConfigDir + "/dbtools/config.yml")
 
 	src,err := c.GetDB(config.Source)
 	ec.FatalErr(err)
