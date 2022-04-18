@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/denisenkom/go-mssqldb v0.12.0
 	github.com/jackc/pgx/v4 v4.15.0
-	github.com/jmoiron/sqlx v1.3.4
+	github.com/jmoiron/sqlx v1.3.5
 	github.com/ppreeper/pad v1.0.0
 	github.com/schollz/progressbar/v3 v3.8.6
 	go.uber.org/zap v1.21.0
