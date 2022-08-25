@@ -8,7 +8,7 @@ require (
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/ppreeper/pad v1.0.0
 	github.com/schollz/progressbar/v3 v3.9.0
-	go.uber.org/zap v1.21.0
+	go.uber.org/zap v1.23.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 
