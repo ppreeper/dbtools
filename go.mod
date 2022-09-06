@@ -7,7 +7,7 @@ require (
 	github.com/jackc/pgx/v4 v4.17.1
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/ppreeper/pad v1.0.0
-	github.com/schollz/progressbar/v3 v3.10.0
+	github.com/schollz/progressbar/v3 v3.10.1
 	go.uber.org/zap v1.23.0
 	gopkg.in/yaml.v2 v2.4.0
 )
