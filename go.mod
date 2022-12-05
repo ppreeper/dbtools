@@ -1,12 +1,12 @@
 module github.com/ppreeper/dbtools
 
-go 1.17
+go 1.18
 
 require (
 	github.com/denisenkom/go-mssqldb v0.12.2
 	github.com/jackc/pgx/v4 v4.17.2
 	github.com/jmoiron/sqlx v1.3.5
-	github.com/ppreeper/pad v1.0.0
+	github.com/ppreeper/str v0.0.0-20221204064031-333e31c1a792
 	github.com/schollz/progressbar/v3 v3.12.1
 	go.uber.org/zap v1.24.0
 	gopkg.in/yaml.v2 v2.4.0

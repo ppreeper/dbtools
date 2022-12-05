@@ -4,15 +4,19 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/ppreeper/dbtools/pkg/configfile"
 	"github.com/ppreeper/dbtools/pkg/database"
 	ec "github.com/ppreeper/dbtools/pkg/errcheck"
-	"github.com/ppreeper/pad"
+	"github.com/ppreeper/str"
 )
 
 func main() {
+	// Config File
+	userConfigDir, err := os.UserConfigDir()
+	ec.CheckErr(err)
+	HostMap := configfile.GetConf(userConfigDir + "/dbtools/config.yml")
+
 	// flags
 	var dbase, stmt string
 	var timer bool
@@ -26,39 +30,32 @@ func main() {
 		fmt.Println("no database specified")
 		os.Exit(1)
 	}
+	src := HostMap[dbase]
+	fmt.Println(src)
 	if stmt == "" {
 		fmt.Println("no query specified")
 		os.Exit(2)
 	}
 
-	// Config File
-	userConfigDir, err := os.UserConfigDir()
-	ec.CheckErr(err)
-	var c configfile.Conf
-	c.GetConf(userConfigDir + "/dbtools/config.yml")
-
-	src, err := c.GetDB(dbase)
-	ec.FatalErr(err)
-
 	// connect to source database
 	// open database connection
-	sdb, err := database.OpenDatabase(src)
-	ec.CheckErr(err)
-	defer func() {
-		if err := sdb.Close(); err != nil {
-			ec.CheckErr(err)
-		}
-	}()
-	ec.CheckErr(err)
+	// sdb, err := database.OpenDatabase(src)
+	// ec.CheckErr(err)
+	// defer func() {
+	// 	if err := sdb.Close(); err != nil {
+	// 		ec.CheckErr(err)
+	// 	}
+	// }()
+	// ec.CheckErr(err)
 
-	start := time.Now()
-	colNames, dataSet := queryData(sdb, stmt)
-	elapsed := time.Since(start)
+	// start := time.Now()
+	// colNames, dataSet := queryData(sdb, stmt)
+	// elapsed := time.Since(start)
 
-	printData(&colNames, &dataSet)
-	if timer {
-		fmt.Printf("query: %s\ntime: %s\n", stmt, elapsed.String())
-	}
+	// printData(&colNames, &dataSet)
+	// if timer {
+	// 	fmt.Printf("query: %s\ntime: %s\n", stmt, elapsed.String())
+	// }
 }
 
 func queryData(sdb *database.Database, stmt string) (colNames []string, dataSet []interface{}) {
@@ -105,7 +102,7 @@ func printData(colNames *[]string, dataSet *[]interface{}) {
 	// print headers
 	hdr := ""
 	for k, v := range *colNames {
-		hdr += fmt.Sprintf("%v", pad.LJustLen(v, colLens[k]))
+		hdr += fmt.Sprintf("%v", str.LJustLen(v, colLens[k]))
 		if k < len(*colNames)-1 {
 			hdr += ";"
 			// fmt.Printf(";")
@@ -126,7 +123,7 @@ func printData(colNames *[]string, dataSet *[]interface{}) {
 			default:
 				vs = fmt.Sprintf("%v", val)
 			}
-			line += pad.LJustLen(vs, colLens[k])
+			line += str.LJustLen(vs, colLens[k])
 			if k < len(*colNames)-1 {
 				line += ";"
 			}

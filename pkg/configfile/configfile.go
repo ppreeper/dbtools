@@ -1,32 +1,26 @@
 package configfile
 
 import (
-	"fmt"
 	"os"
 
-	"github.com/ppreeper/dbtools/pkg/database"
 	ec "github.com/ppreeper/dbtools/pkg/errcheck"
 	"gopkg.in/yaml.v2"
 )
 
-// Conf array of Dbase
-type Conf struct {
-	Databases []database.Database `json:"databases,omitempty"`
+type Host struct {
+	Hostname string `default:"localhost" json:"hostname"`
+	Driver   string `default:"pgx" json:"driver"`
+	Database string `default:"odoo" json:"database,omitempty"`
+	Username string `default:"odoo" json:"username"`
+	Password string `default:"odoo" json:"password"`
+	Port     int    `default:"8069" json:"port,omitempty"`
 }
 
-func (c *Conf) GetConf(configFile string) (*Conf, error) {
+func GetConf(configFile string) map[string]Host {
 	yamlFile, err := os.ReadFile(configFile)
 	ec.CheckErr(err)
-	err = yaml.Unmarshal(yamlFile, c)
+	data := make(map[string]Host)
+	err = yaml.Unmarshal(yamlFile, data)
 	ec.CheckErr(err)
-	return c, err
-}
-
-func (c *Conf) GetDB(name string) (d database.Database, err error) {
-	for _, v := range c.Databases {
-		if v.Name == name {
-			return v, err
-		}
-	}
-	return database.Database{}, fmt.Errorf("no database found")
+	return data
 }

@@ -13,7 +13,6 @@ import (
 
 	"github.com/ppreeper/dbtools/pkg/configfile"
 	"github.com/ppreeper/dbtools/pkg/database"
-	"github.com/ppreeper/pad"
 	"github.com/schollz/progressbar/v3"
 
 	"go.uber.org/zap"
@@ -70,6 +69,11 @@ type Config struct {
 }
 
 func main() {
+	// Config File
+	userConfigDir, err := os.UserConfigDir()
+	ec.CheckErr(err)
+	HostMap := configfile.GetConf(userConfigDir + "/dbtools/config.yml")
+
 	// init config struct
 	config := Config{
 		JobCount: 8,
@@ -108,64 +112,60 @@ func main() {
 	flag.Parse()
 
 	// Config File
-	userConfigDir, err := os.UserConfigDir()
-	ec.CheckErr(err)
-	userDir, err := os.UserHomeDir()
-	ec.CheckErr(err)
-	var c configfile.Conf
-	c.GetConf(userConfigDir + "/dbtools/config.yml")
+	// userDir, err := os.UserHomeDir()
+	// ec.CheckErr(err)
 
 	// logging
-	logName := userDir + "/" + config.LogFile
-	_, err = os.Stat(logName)
-	if os.IsNotExist(err) {
-		file, err := os.Create(logName)
-		ec.FatalErr(err)
-		defer file.Close()
-	}
-	err = os.Truncate(logName, 0)
-	ec.CheckErr(err)
-	cfg := zap.NewProductionConfig()
-	cfg.OutputPaths = []string{logName}
-	logger, _ := cfg.Build()
-	log = logger.Sugar()
+	// logName := userDir + "/" + config.LogFile
+	// _, err = os.Stat(logName)
+	// if os.IsNotExist(err) {
+	// 	file, err := os.Create(logName)
+	// 	ec.FatalErr(err)
+	// 	defer file.Close()
+	// }
+	// err = os.Truncate(logName, 0)
+	// ec.CheckErr(err)
+	// cfg := zap.NewProductionConfig()
+	// cfg.OutputPaths = []string{logName}
+	// logger, _ := cfg.Build()
+	// log = logger.Sugar()
 
 	// config options display
-	log.Infow("start", "config", config)
+	// log.Infow("start", "config", config)
 
-	fmt.Println(pad.RJustLen("Source:", 8), pad.LJustLen(config.Source, 20), pad.RJustLen("SSchemaName:", 13), pad.LJustLen(config.SSchemaName, 20))
-	fmt.Println(pad.RJustLen("Dest:", 8), pad.LJustLen(config.Dest, 20), pad.RJustLen("DSchemaName:", 13), pad.LJustLen(config.DSchemaName, 20))
-	fmt.Println(pad.RJustLen("Table:", 8), config.Table, pad.RJustLen("TableName:", 13), config.TableName)
-	fmt.Println(pad.RJustLen("View:", 8), config.View, pad.RJustLen("ViewName:", 13), config.ViewName)
-	fmt.Println(pad.RJustLen("Routine:", 8), config.Routine, pad.RJustLen("RoutineName:", 13), config.RoutineName)
-	fmt.Println(pad.RJustLen("Index:", 8), config.Index, pad.RJustLen("IndexName:", 13), config.IndexName)
-	fmt.Println(pad.RJustLen("All:", 8), config.All, pad.RJustLen("Link:", 8), config.Link, pad.RJustLen("Update:", 8), config.Update, pad.RJustLen("Debug:", 8), config.Debug)
+	// fmt.Println(str.RJustLen("Source:", 8), str.LJustLen(config.Source, 20), str.RJustLen("SSchemaName:", 13), str.LJustLen(config.SSchemaName, 20))
+	// fmt.Println(str.RJustLen("Dest:", 8), str.LJustLen(config.Dest, 20), str.RJustLen("DSchemaName:", 13), str.LJustLen(config.DSchemaName, 20))
+	// fmt.Println(str.RJustLen("Table:", 8), config.Table, str.RJustLen("TableName:", 13), config.TableName)
+	// fmt.Println(str.RJustLen("View:", 8), config.View, str.RJustLen("ViewName:", 13), config.ViewName)
+	// fmt.Println(str.RJustLen("Routine:", 8), config.Routine, str.RJustLen("RoutineName:", 13), config.RoutineName)
+	// fmt.Println(str.RJustLen("Index:", 8), config.Index, str.RJustLen("IndexName:", 13), config.IndexName)
+	// fmt.Println(str.RJustLen("All:", 8), config.All, str.RJustLen("Link:", 8), config.Link, str.RJustLen("Update:", 8), config.Update, str.RJustLen("Debug:", 8), config.Debug)
 
-	config.Filter = regexp.MustCompilePOSIX(config.FilterDef)
+	// config.Filter = regexp.MustCompilePOSIX(config.FilterDef)
 
 	// get database connections
-	src, err := c.GetDB(config.Source)
-	ec.FatalErr(err)
-	dst, err := c.GetDB(config.Dest)
-	ec.FatalErr(err)
+	// src, err := c.GetDB(config.Source)
+	// ec.FatalErr(err)
+	// dst, err := c.GetDB(config.Dest)
+	// ec.FatalErr(err)
 
 	//////////
 	// check all or table,view,routine
 	//////////
 
-	if config.All {
-		config.Table = true
-		config.View = true
-		config.Routine = true
-	}
+	// if config.All {
+	// 	config.Table = true
+	// 	config.View = true
+	// 	config.Routine = true
+	// }
 
-	if (!config.Table && config.TableName == "") &&
-		(!config.View && config.ViewName == "") &&
-		(!config.Routine && config.RoutineName == "") &&
-		(!config.Index && config.IndexName == "") {
-		fmt.Println("table, view, routine, index, flags have to be selected")
-		return
-	}
+	// if (!config.Table && config.TableName == "") &&
+	// 	(!config.View && config.ViewName == "") &&
+	// 	(!config.Routine && config.RoutineName == "") &&
+	// 	(!config.Index && config.IndexName == "") {
+	// 	fmt.Println("table, view, routine, index, flags have to be selected")
+	// 	return
+	// }
 
 	//////////
 	// Source DB
@@ -174,24 +174,26 @@ func main() {
 		fmt.Println("No source specified")
 		return
 	}
+	sdb := HostMap[config.Source]
+	fmt.Println(sdb)
 
 	//////////
 	// get schemas
 	//////////
 
 	// open source database connection
-	sdb := dbOpen(src)
-	defer sdb.Close()
+	// sdb := dbOpen(src)
+	// defer sdb.Close()
 
-	var sSchemas []database.Schema
-	if config.SSchemaName != "" {
-		var s = database.Schema{Name: config.SSchemaName}
-		sSchemas = append(sSchemas, s)
-	} else {
-		sSchemas, err = sdb.GetSchemas(config.Timeout)
-		ec.CheckErr(err)
-	}
-	fmt.Println("schemas: ", sSchemas)
+	// var sSchemas []database.Schema
+	// if config.SSchemaName != "" {
+	// 	var s = database.Schema{Name: config.SSchemaName}
+	// 	sSchemas = append(sSchemas, s)
+	// } else {
+	// 	sSchemas, err = sdb.GetSchemas(config.Timeout)
+	// 	ec.CheckErr(err)
+	// }
+	// fmt.Println("schemas: ", sSchemas)
 
 	//////////
 	// dest DB
@@ -200,50 +202,51 @@ func main() {
 		fmt.Println("No destination specified")
 		return
 	}
+	ddb := HostMap[config.Dest]
+	fmt.Println(ddb)
 
-	var ddb *database.Database
-	var DSchema string
+	// var DSchema string
 
-	if config.Dest == "file:" {
-		ddb = sdb
-	} else {
-		ddb = dbOpen(dst)
-	}
-	defer ddb.Close()
+	// if config.Dest == "file:" {
+	// 	ddb = sdb
+	// } else {
+	// 	ddb = dbOpen(dst)
+	// }
+	// defer ddb.Close()
 
-	for _, s := range sSchemas {
-		if config.Dest == "file:" {
-			DSchema = s.Name
-		} else if config.Dest != "file:" && config.DSchemaName == "" {
-			DSchema = s.Name
-		} else {
-			DSchema = config.DSchemaName
-		}
+	// for _, s := range sSchemas {
+	// 	if config.Dest == "file:" {
+	// 		DSchema = s.Name
+	// 	} else if config.Dest != "file:" && config.DSchemaName == "" {
+	// 		DSchema = s.Name
+	// 	} else {
+	// 		DSchema = config.DSchemaName
+	// 	}
 
-		var data = database.Conn{
-			Source:  sdb,
-			Dest:    ddb,
-			SSchema: s.Name,
-			DSchema: DSchema,
-		}
+	// 	var data = database.Conn{
+	// 		Source:  sdb,
+	// 		Dest:    ddb,
+	// 		SSchema: s.Name,
+	// 		DSchema: DSchema,
+	// 	}
 
-		if config.Table || config.TableName != "" {
-			fmt.Println("table:", s.Name)
-			getTables(&config, &data)
-		}
-		if config.View || config.ViewName != "" {
-			fmt.Println("view:", s.Name)
-			getViews(&config, &data)
-		}
-		if config.Routine || config.RoutineName != "" {
-			fmt.Println("routine:", s.Name)
-			getRoutines(&config, &data)
-		}
-		if config.Index || config.IndexName != "" {
-			fmt.Println("index:", s.Name)
-			getIndexes(&config, &data)
-		}
-	}
+	// 	if config.Table || config.TableName != "" {
+	// 		fmt.Println("table:", s.Name)
+	// 		getTables(&config, &data)
+	// 	}
+	// 	if config.View || config.ViewName != "" {
+	// 		fmt.Println("view:", s.Name)
+	// 		getViews(&config, &data)
+	// 	}
+	// 	if config.Routine || config.RoutineName != "" {
+	// 		fmt.Println("routine:", s.Name)
+	// 		getRoutines(&config, &data)
+	// 	}
+	// 	if config.Index || config.IndexName != "" {
+	// 		fmt.Println("index:", s.Name)
+	// 		getIndexes(&config, &data)
+	// 	}
+	// }
 }
 
 func getTables(config *Config, data *database.Conn) {
