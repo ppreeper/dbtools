@@ -15,16 +15,18 @@ func main() {
 	// Config File
 	userConfigDir, err := os.UserConfigDir()
 	ec.CheckErr(err)
-	HostMap := configfile.GetConf(userConfigDir + "/dbtools/config.yml")
 
 	// flags
-	var dbase, stmt string
+	var configFile, dbase, stmt string
 	var timer bool
 
+	flag.StringVar(&configFile, "c", userConfigDir+"/dbtools/config.yml", "config.yml")
 	flag.StringVar(&dbase, "db", "", "database")
 	flag.StringVar(&stmt, "q", "", "sql query")
 	flag.BoolVar(&timer, "t", false, "sql timer")
 	flag.Parse()
+
+	HostMap := configfile.GetConf(configFile)
 
 	if dbase == "" {
 		fmt.Println("no database specified")
