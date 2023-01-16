@@ -9,11 +9,11 @@ import (
 
 type Host struct {
 	Hostname string `default:"localhost" json:"hostname"`
+	Port     int    `default:"8069" json:"port,omitempty"`
 	Driver   string `default:"pgx" json:"driver"`
 	Database string `default:"odoo" json:"database,omitempty"`
 	Username string `default:"odoo" json:"username"`
 	Password string `default:"odoo" json:"password"`
-	Port     int    `default:"8069" json:"port,omitempty"`
 }
 
 func GetConf(configFile string) map[string]Host {

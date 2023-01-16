@@ -7,7 +7,7 @@ import (
 	ec "github.com/ppreeper/dbtools/pkg/errcheck"
 )
 
-//GenTable generate table craeation
+// GenTable generate table craeation
 func (db *Database) GenTable(conn *Conn, table string, cols []Column, pkey []PKey) (sqld, sqlc string) {
 	clen := len(cols)
 	plen := len(pkey)
@@ -83,7 +83,7 @@ func (db *Database) GenTableIndexSQL(conn *Conn, tableName string) (sqld, sqlc s
 	return
 }
 
-//GenLink generate table creation
+// GenLink generate table creation
 func (db *Database) GenLink(conn *Conn, table string, cols []Column, pkey []PKey) (sqld, sqlc string) {
 	tmp := ""
 	if table == strings.ToUpper(table) {
@@ -124,12 +124,12 @@ func (db *Database) GenLink(conn *Conn, table string, cols []Column, pkey []PKey
 				sqlc += fmt.Sprintf("\"%s\" %s\"%s\",\n", c.ColumnName, collation, c.ColumnName)
 			}
 		}
-		sqlc += fmt.Sprintf("FROM \"%s\".\"%s\".\"%s\".\"%s\";\n", conn.Source.Host, conn.Source.Database, conn.SSchema, table)
+		sqlc += fmt.Sprintf("FROM \"%s\".\"%s\".\"%s\".\"%s\";\n", conn.Source.Hostname, conn.Source.Database, conn.SSchema, table)
 	}
 	return sqld, sqlc
 }
 
-//GenUpdate generate update procedure
+// GenUpdate generate update procedure
 func (db *Database) GenUpdate(conn *Conn, table string, cols []Column, pkey []PKey) (sqld, sqlc string) {
 	columns := trimCols(cols, pkey)
 

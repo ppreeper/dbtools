@@ -14,16 +14,13 @@ import (
 // Database struct contains sql pointer
 type Database struct {
 	Name     string `json:"name,omitempty"`
+	Hostname string `json:"hostname,omitempty"`
+	Port     int    `json:"port,omitempty"`
 	Driver   string `json:"driver,omitempty"`
-	Host     string `json:"host,omitempty"`
-	Port     string `json:"port,omitempty"`
 	Database string `json:"database,omitempty"`
 	Username string `json:"username,omitempty"`
 	Password string `json:"password,omitempty"`
 	URI      string `json:"uri,omitempty"`
-	// Log      *zap.SugaredLogger
-	Drive  string `json:"drive,omitempty"`
-	SubDir string `json:"subdir,omitempty"`
 	*sqlx.DB
 }
 
@@ -50,18 +47,18 @@ func OpenDatabase(db Database) (*Database, error) {
 // GenURI generate db uri string
 func (db *Database) GetURI() {
 	if db.Driver == "postgres" || db.Driver == "pgx" {
-		port := "5432"
-		if db.Port != "" {
+		port := 5432
+		if db.Port != 0 {
 			port = db.Port
 		}
-		db.URI = "postgres://" + db.Username + ":" + db.Password + "@" + db.Host + ":" + port + "/" + db.Database + "?sslmode=disable"
+		db.URI = fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable", db.Username, db.Password, db.Hostname, port, db.Database)
 	}
 	if db.Driver == "mssql" {
-		db.URI = "server=" + db.Host + ";user id=" + db.Username + ";password=" + db.Password + ";database=" + db.Database + ";encrypt=disable;connection timeout=7200;keepAlive=30"
+		db.URI = fmt.Sprintf("server=%s;user id=%s;password=%s;database=%s;encrypt=disable;connection timeout=7200;keepAlive=30", db.Hostname, db.Username, db.Password, db.Database)
 	}
 }
 
-//ExecProcedure executes stored procedure
+// ExecProcedure executes stored procedure
 func (db *Database) ExecProcedure(q string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -70,9 +67,4 @@ func (db *Database) ExecProcedure(q string) {
 	if err != nil {
 		panic(err)
 	}
-}
-
-func GenSubDir(db *Database) (subdir string) {
-	subdir = fmt.Sprintf("%s:\\%s", db.Drive, db.SubDir)
-	return
 }
