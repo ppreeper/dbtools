@@ -12,7 +12,7 @@ import (
 // Tables
 //////////
 
-//Table list of tables
+// Table list of tables
 type Table struct {
 	Name string `db:"TABLE_NAME"`
 }
@@ -22,7 +22,7 @@ func (db *Database) GetTables(schemaName, ttype string, timeout int) ([]Table, e
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 	q := ""
-	if db.Driver == "postgres" || db.Driver == "mssql" {
+	if db.Driver == "postgres" || db.Driver == "pgx" || db.Driver == "mssql" {
 		q += "select TABLE_NAME \"TABLE_NAME\" "
 		q += "from INFORMATION_SCHEMA.TABLES "
 		q += "where TABLE_SCHEMA = '" + schemaName + "' "

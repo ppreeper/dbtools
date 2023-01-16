@@ -6,14 +6,14 @@ import (
 	"time"
 )
 
-//Column struct
+// Column struct
 type Column struct {
 	Column     string `db:"CL"`
 	ColumnName string `db:"CN"`
 	DataType   string `db:"DT"`
 }
 
-//GetColumnDetail func
+// GetColumnDetail func
 func (db *Database) GetColumnDetail(conn *Conn, t string, debug bool, timeout int) ([]Column, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
@@ -44,7 +44,7 @@ func (db *Database) GetColumnDetail(conn *Conn, t string, debug bool, timeout in
 			q += "CASE WHEN C.COLUMN_DEFAULT IS NULL THEN ''\n"
 			q += "ELSE ' DEFAULT ' + SUBSTRING(C.COLUMN_DEFAULT,CHARINDEX(' as ', C.COLUMN_DEFAULT)+4,LEN(C.COLUMN_DEFAULT)-CHARINDEX(' as ', C.COLUMN_DEFAULT)) END\n"
 			q += "\"CL\", C.COLUMN_NAME \"CN\", UPPER(DATA_TYPE) \"DT\"\n"
-		} else if conn.Dest.Driver == "postgres" {
+		} else if conn.Dest.Driver == "postgres" || conn.Dest.Driver == "pgx" {
 			q += "-- mssql to pgsql\n"
 			q += "SELECT\n"
 			q += "'\"' + C.COLUMN_NAME + '\" ' +\n"
@@ -71,7 +71,7 @@ func (db *Database) GetColumnDetail(conn *Conn, t string, debug bool, timeout in
 			q += "ELSE ' DEFAULT ' + substring(C.COLUMN_DEFAULT,CASE WHEN CHARINDEX(' as ', C.COLUMN_DEFAULT) = 0 then 0 else CHARINDEX(' as ', C.COLUMN_DEFAULT)+4 end,LEN(C.COLUMN_DEFAULT)+1-CASE WHEN CHARINDEX(' as ', C.COLUMN_DEFAULT) = 0 then 0 else CHARINDEX(' as ', C.COLUMN_DEFAULT) end) END\n"
 			q += "\"CL\", C.COLUMN_NAME \"CN\", UPPER(DATA_TYPE) \"DT\"\n"
 		}
-	} else if conn.Source.Driver == "postgres" {
+	} else if conn.Source.Driver == "postgres" || conn.Source.Driver == "pgx" {
 		if conn.Dest.Driver == "mssql" {
 			q += "-- pgsql to mssql\n"
 			q += "SELECT\n"
@@ -99,7 +99,7 @@ func (db *Database) GetColumnDetail(conn *Conn, t string, debug bool, timeout in
 			q += "CASE WHEN C.COLUMN_DEFAULT IS NULL THEN ''\n"
 			q += "ELSE ' DEFAULT ' || case when POSITION('::' in C.COLUMN_DEFAULT) > 0 then SUBSTRING(C.COLUMN_DEFAULT,1,POSITION('::' in C.COLUMN_DEFAULT)-1) else C.COLUMN_DEFAULT END end\n"
 			q += "\"CL\", C.COLUMN_NAME \"CN\", UPPER(DATA_TYPE) \"DT\"\n"
-		} else if conn.Dest.Driver == "postgres" {
+		} else if conn.Dest.Driver == "postgres" || conn.Dest.Driver == "pgx" {
 			q += "-- pgsql to pgsql\n"
 			q += "SELECT\n"
 			q += "'\"' || C.COLUMN_NAME || '\" ' ||\n"

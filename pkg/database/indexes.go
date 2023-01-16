@@ -28,7 +28,7 @@ func (db *Database) GetIndexes(schema string, timeout int) ([]IndexList, error) 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 	q := ""
-	if db.Driver == "postgres" {
+	if db.Driver == "postgres" || db.Driver == "pgx" {
 		q += "select p.indexname\n"
 		q += "from pg_catalog.pg_indexes p\n"
 		q += "left join (\n"
@@ -70,7 +70,7 @@ func (db *Database) GetIndexes(schema string, timeout int) ([]IndexList, error) 
 // GetIndexeschema returns Indexes and definition
 func (db *Database) GetIndexSchema(schema, index string) (Index, error) {
 	q := ""
-	if db.Driver == "postgres" {
+	if db.Driver == "postgres" || db.Driver == "pgx" {
 		q += "select p.schemaname,p.tablename,p.indexname" + "\n"
 		q += `,'"'||replace(replace(split_part(split_part(p.indexdef,'(',2),')',1),'"',''),',','","')||'"' as indexcolumns` + "\n"
 		q += `,p.indexdef` + "\n"
@@ -131,7 +131,7 @@ func (db *Database) GetIndexSchema(schema, index string) (Index, error) {
 // GetIndexeschema returns Indexes and definition
 func (db *Database) GetTableIndexSchema(schema, table string) ([]Index, error) {
 	q := ""
-	if db.Driver == "postgres" {
+	if db.Driver == "postgres" || db.Driver == "pgx" {
 		q += "select p.schemaname,p.tablename,p.indexname" + "\n"
 		q += `,'"'||replace(replace(split_part(split_part(p.indexdef,'(',2),')',1),'"',''),',','","')||'"' as indexcolumns` + "\n"
 		q += `,p.indexdef` + "\n"

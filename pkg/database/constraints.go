@@ -6,20 +6,17 @@ import (
 	"time"
 )
 
-//PKey struct
+// PKey struct
 type PKey struct {
 	PKey string `db:"CL"`
 }
 
-//GetPKey func
+// GetPKey func
 func (db *Database) GetPKey(conn *Conn, table string, timeout int) ([]PKey, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 	q := ""
-	// if src.Driver == "" {
-	// 	src = dst
-	// }
-	if conn.Source.Driver == "postgres" || conn.Source.Driver == "mssql" {
+	if conn.Source.Driver == "postgres" || conn.Source.Driver == "pgx" || conn.Source.Driver == "mssql" {
 		q += "SELECT C.COLUMN_NAME \"CL\""
 		q += fmt.Sprintf("\nFROM %s.INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE C", conn.Source.Database)
 		q += fmt.Sprintf("\nJOIN %s.INFORMATION_SCHEMA.COLUMNS CLM ON", conn.Source.Database)
@@ -40,7 +37,6 @@ func (db *Database) GetPKey(conn *Conn, table string, timeout int) ([]PKey, erro
 		q += "\n)"
 		q += "\nORDER BY CLM.ORDINAL_POSITION"
 	}
-	// fmt.Println(q)
 	var pkey []PKey
 	if err := db.SelectContext(ctx, &pkey, q); err != nil {
 		return nil, fmt.Errorf("select: %w", err)

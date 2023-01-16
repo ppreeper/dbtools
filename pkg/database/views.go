@@ -29,7 +29,7 @@ func (db *Database) GetViews(schema string, timeout int) ([]ViewList, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 	q := ""
-	if db.Driver == "postgres" || db.Driver == "mssql" {
+	if db.Driver == "postgres" || db.Driver == "pgx" || db.Driver == "mssql" {
 		q += "SELECT TABLE_NAME \"TABLE_NAME\"" + "\n"
 		q += "FROM INFORMATION_SCHEMA.VIEWS" + "\n"
 		q += "WHERE TABLE_SCHEMA = '" + schema + "'" + "\n"
@@ -46,7 +46,7 @@ func (db *Database) GetViews(schema string, timeout int) ([]ViewList, error) {
 // GetViewSchema returns views and definition
 func (db *Database) GetViewSchema(schema, view string) (View, error) {
 	q := ""
-	if db.Driver == "postgres" || db.Driver == "mssql" {
+	if db.Driver == "postgres" || db.Driver == "pgx" || db.Driver == "mssql" {
 		q += "SELECT TABLE_NAME \"TABLE_NAME\", VIEW_DEFINITION \"VIEW_DEFINITION\"" + "\n"
 		q += "FROM INFORMATION_SCHEMA.VIEWS" + "\n"
 		q += "WHERE TABLE_SCHEMA = '" + schema + "'" + "\n"
@@ -64,7 +64,7 @@ func (db *Database) GetViewSchema(schema, view string) (View, error) {
 func (db *Database) GetView(d Database, schema string, view View, dbg bool) {
 	fmt.Printf("\n-- VIEW: %s.%s", schema, view.Name)
 	q := ""
-	if d.Driver == "postgres" {
+	if d.Driver == "postgres" || d.Driver == "pgx" {
 		q += "DROP VIEW " + schema + "." + view.Name + ";\n"
 		q += "CREATE VIEW " + schema + "." + view.Name + " AS \n"
 		q += view.Definition

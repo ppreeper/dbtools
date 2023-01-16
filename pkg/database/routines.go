@@ -32,7 +32,7 @@ func (db *Database) GetRoutines(schema string, timeout int) ([]RoutineList, erro
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 	q := ""
-	if db.Driver == "postgres" || db.Driver == "mssql" {
+	if db.Driver == "postgres" || db.Driver == "pgx" || db.Driver == "mssql" {
 		q += "SELECT ROUTINE_NAME \"ROUTINE_NAME\"" + "\n"
 		q += "FROM INFORMATION_SCHEMA.ROUTINES" + "\n"
 		q += "WHERE ROUTINE_SCHEMA = '" + schema + "'" + "\n"
@@ -49,7 +49,7 @@ func (db *Database) GetRoutines(schema string, timeout int) ([]RoutineList, erro
 // GetRoutineSchema returns routine and definition
 func (db *Database) GetRoutineSchema(schema, routine string) (Routine, error) {
 	q := ""
-	if db.Driver == "postgres" || db.Driver == "mssql" {
+	if db.Driver == "postgres" || db.Driver == "pgx" || db.Driver == "mssql" {
 		q += "SELECT ROUTINE_NAME \"ROUTINE_NAME\"" + "\n"
 		q += ",ROUTINE_TYPE \"ROUTINE_TYPE\"" + "\n"
 		q += ",ROUTINE_DEFINITION \"ROUTINE_DEFINITION\"" + "\n"
@@ -72,7 +72,7 @@ func (db *Database) GetRoutineSchema(schema, routine string) (Routine, error) {
 func (db *Database) GetRoutine(d Database, schema string, r Routine, dbg bool) {
 	fmt.Printf("\n-- ROUTINE: %s.%s", schema, r.Name)
 	q := ""
-	if d.Driver == "postgres" {
+	if d.Driver == "postgres" || d.Driver == "pgx" {
 		if r.Type == "PROCEDURE" {
 			q += "DROP " + r.Type + " IF EXISTS " + schema + "." + r.Name + "();\n"
 			q += "CREATE OR REPLACE " + r.Type + " " + schema + "." + r.Name + "()\n"

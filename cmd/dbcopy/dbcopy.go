@@ -13,6 +13,7 @@ import (
 
 	"github.com/ppreeper/dbtools/pkg/configfile"
 	"github.com/ppreeper/dbtools/pkg/database"
+	"github.com/ppreeper/str"
 	"github.com/schollz/progressbar/v3"
 
 	"go.uber.org/zap"
@@ -29,20 +30,6 @@ import (
 )
 
 var log *zap.SugaredLogger
-
-func dbOpen(d database.Database) *database.Database {
-	db, err := database.OpenDatabase(database.Database{
-		Name:     d.Name,
-		Driver:   d.Driver,
-		Host:     d.Host,
-		Port:     d.Port,
-		Database: d.Database,
-		Username: d.Username,
-		Password: d.Password,
-	})
-	ec.CheckErr(err)
-	return db
-}
 
 type Config struct {
 	Source      string
@@ -72,14 +59,13 @@ func main() {
 	// Config File
 	userConfigDir, err := os.UserConfigDir()
 	ec.CheckErr(err)
-	HostMap := configfile.GetConf(userConfigDir + "/dbtools/config.yml")
-
-	// init config struct
-	config := Config{
-		JobCount: 8,
-	}
 
 	// Flags
+	var configFile string
+	// init config struct
+	var config = Config{}
+
+	flag.StringVar(&configFile, "c", userConfigDir+"/dbtools/config.yml", "config.yml")
 	flag.StringVar(&config.Source, "source", "", "source database")
 	flag.StringVar(&config.SSchemaName, "ss", "", "source schema")
 	flag.StringVar(&config.Dest, "dest", "", "destination database or file:")
@@ -111,142 +97,193 @@ func main() {
 
 	flag.Parse()
 
-	// Config File
-	// userDir, err := os.UserHomeDir()
-	// ec.CheckErr(err)
+	setupLogging(config.LogFile)
 
-	// logging
-	// logName := userDir + "/" + config.LogFile
-	// _, err = os.Stat(logName)
-	// if os.IsNotExist(err) {
-	// 	file, err := os.Create(logName)
-	// 	ec.FatalErr(err)
-	// 	defer file.Close()
-	// }
-	// err = os.Truncate(logName, 0)
-	// ec.CheckErr(err)
-	// cfg := zap.NewProductionConfig()
-	// cfg.OutputPaths = []string{logName}
-	// logger, _ := cfg.Build()
-	// log = logger.Sugar()
+	HostMap := configfile.GetConf(configFile)
 
 	// config options display
-	// log.Infow("start", "config", config)
+	log.Infow("start", "config", config)
 
-	// fmt.Println(str.RJustLen("Source:", 8), str.LJustLen(config.Source, 20), str.RJustLen("SSchemaName:", 13), str.LJustLen(config.SSchemaName, 20))
-	// fmt.Println(str.RJustLen("Dest:", 8), str.LJustLen(config.Dest, 20), str.RJustLen("DSchemaName:", 13), str.LJustLen(config.DSchemaName, 20))
-	// fmt.Println(str.RJustLen("Table:", 8), config.Table, str.RJustLen("TableName:", 13), config.TableName)
-	// fmt.Println(str.RJustLen("View:", 8), config.View, str.RJustLen("ViewName:", 13), config.ViewName)
-	// fmt.Println(str.RJustLen("Routine:", 8), config.Routine, str.RJustLen("RoutineName:", 13), config.RoutineName)
-	// fmt.Println(str.RJustLen("Index:", 8), config.Index, str.RJustLen("IndexName:", 13), config.IndexName)
-	// fmt.Println(str.RJustLen("All:", 8), config.All, str.RJustLen("Link:", 8), config.Link, str.RJustLen("Update:", 8), config.Update, str.RJustLen("Debug:", 8), config.Debug)
+	fmt.Println(str.RJustLen("Source:", 8), str.LJustLen(config.Source, 20), str.RJustLen("SSchemaName:", 13), str.LJustLen(config.SSchemaName, 20))
+	fmt.Println(str.RJustLen("Dest:", 8), str.LJustLen(config.Dest, 20), str.RJustLen("DSchemaName:", 13), str.LJustLen(config.DSchemaName, 20))
+	fmt.Println(str.RJustLen("Table:", 8), config.Table, str.RJustLen("TableName:", 13), config.TableName)
+	fmt.Println(str.RJustLen("View:", 8), config.View, str.RJustLen("ViewName:", 13), config.ViewName)
+	fmt.Println(str.RJustLen("Routine:", 8), config.Routine, str.RJustLen("RoutineName:", 13), config.RoutineName)
+	fmt.Println(str.RJustLen("Index:", 8), config.Index, str.RJustLen("IndexName:", 13), config.IndexName)
+	fmt.Println(str.RJustLen("All:", 8), config.All, str.RJustLen("Link:", 8), config.Link, str.RJustLen("Update:", 8), config.Update, str.RJustLen("Debug:", 8), config.Debug)
 
-	// config.Filter = regexp.MustCompilePOSIX(config.FilterDef)
+	config.Filter = regexp.MustCompilePOSIX(config.FilterDef)
 
-	// get database connections
-	// src, err := c.GetDB(config.Source)
-	// ec.FatalErr(err)
-	// dst, err := c.GetDB(config.Dest)
-	// ec.FatalErr(err)
+	sdbConfig, ddbConfig := config.getDBConfigs(HostMap)
 
-	//////////
-	// check all or table,view,routine
-	//////////
+	config.checkParams()
 
-	// if config.All {
-	// 	config.Table = true
-	// 	config.View = true
-	// 	config.Routine = true
-	// }
+	sdb, err := dbOpen(sdbConfig)
+	ec.FatalErr(err)
+	defer sdb.Close()
 
-	// if (!config.Table && config.TableName == "") &&
-	// 	(!config.View && config.ViewName == "") &&
-	// 	(!config.Routine && config.RoutineName == "") &&
-	// 	(!config.Index && config.IndexName == "") {
-	// 	fmt.Println("table, view, routine, index, flags have to be selected")
-	// 	return
-	// }
-
-	//////////
-	// Source DB
-	//////////
-	if config.Source == "" {
-		fmt.Println("No source specified")
-		return
+	if config.Dest == "file:" {
+		ddbConfig = sdbConfig
 	}
-	sdb := HostMap[config.Source]
-	fmt.Println(sdb)
+	ddb, err := dbOpen(ddbConfig)
+	ec.FatalErr(err)
+	defer ddb.Close()
 
-	//////////
+	// =======
 	// get schemas
-	//////////
+	// =======
 
-	// open source database connection
-	// sdb := dbOpen(src)
-	// defer sdb.Close()
+	sSchemas, err := sdb.GetSchemas(config.Timeout)
+	ec.CheckErr(err)
 
-	// var sSchemas []database.Schema
-	// if config.SSchemaName != "" {
-	// 	var s = database.Schema{Name: config.SSchemaName}
-	// 	sSchemas = append(sSchemas, s)
-	// } else {
-	// 	sSchemas, err = sdb.GetSchemas(config.Timeout)
-	// 	ec.CheckErr(err)
-	// }
-	// fmt.Println("schemas: ", sSchemas)
-
-	//////////
-	// dest DB
-	//////////
-	if config.Dest == "" {
-		fmt.Println("No destination specified")
-		return
+	if config.SSchemaName != "" {
+		// if SourceSchema specified then look it up
+		var s = database.Schema{}
+		for _, v := range sSchemas {
+			if v.Name == config.SSchemaName {
+				s = database.Schema{Name: config.SSchemaName}
+			}
+		}
+		if s.Name == "" {
+			fmt.Println("no schema found")
+			os.Exit(0)
+		}
+		sSchemas = []database.Schema{s}
 	}
-	ddb := HostMap[config.Dest]
-	fmt.Println(ddb)
+	fmt.Println("schemas: ", sSchemas)
 
-	// var DSchema string
+	dSchemas, err := ddb.GetSchemas(config.Timeout)
+	ec.CheckErr(err)
 
-	// if config.Dest == "file:" {
-	// 	ddb = sdb
-	// } else {
-	// 	ddb = dbOpen(dst)
-	// }
-	// defer ddb.Close()
+	if config.DSchemaName != "" {
+		// if DSchemaName specified then look it up
+		var s = database.Schema{}
+		for _, v := range dSchemas {
+			if v.Name == config.DSchemaName {
+				s = database.Schema{Name: config.DSchemaName}
+			}
+		}
+		if s.Name == "" {
+			fmt.Println("no schema found")
+			os.Exit(0)
+		}
+		dSchemas = []database.Schema{s}
+	}
+	fmt.Println("schemas: ", dSchemas)
 
-	// for _, s := range sSchemas {
-	// 	if config.Dest == "file:" {
-	// 		DSchema = s.Name
-	// 	} else if config.Dest != "file:" && config.DSchemaName == "" {
-	// 		DSchema = s.Name
-	// 	} else {
-	// 		DSchema = config.DSchemaName
-	// 	}
+	for _, s := range sSchemas {
+		fmt.Println(s)
+		var DSchema string
+		if config.Dest == "file:" {
+			DSchema = s.Name
+		} else if config.Dest != "file:" && config.DSchemaName == "" {
+			DSchema = s.Name
+		} else {
+			DSchema = config.DSchemaName
+		}
 
-	// 	var data = database.Conn{
-	// 		Source:  sdb,
-	// 		Dest:    ddb,
-	// 		SSchema: s.Name,
-	// 		DSchema: DSchema,
-	// 	}
+		var data = database.Conn{
+			Source:  sdb,
+			Dest:    ddb,
+			SSchema: s.Name,
+			DSchema: DSchema,
+		}
+		fmt.Println(data.SSchema, data.DSchema)
 
-	// 	if config.Table || config.TableName != "" {
-	// 		fmt.Println("table:", s.Name)
-	// 		getTables(&config, &data)
-	// 	}
-	// 	if config.View || config.ViewName != "" {
-	// 		fmt.Println("view:", s.Name)
-	// 		getViews(&config, &data)
-	// 	}
-	// 	if config.Routine || config.RoutineName != "" {
-	// 		fmt.Println("routine:", s.Name)
-	// 		getRoutines(&config, &data)
-	// 	}
-	// 	if config.Index || config.IndexName != "" {
-	// 		fmt.Println("index:", s.Name)
-	// 		getIndexes(&config, &data)
-	// 	}
-	// }
+		if config.Table || config.TableName != "" {
+			fmt.Println("table:", s.Name)
+			getTables(&config, &data)
+		}
+		// if config.View || config.ViewName != "" {
+		// 	fmt.Println("view:", s.Name)
+		// 	getViews(&config, &data)
+		// }
+		// if config.Routine || config.RoutineName != "" {
+		// 	fmt.Println("routine:", s.Name)
+		// 	getRoutines(&config, &data)
+		// }
+		// if config.Index || config.IndexName != "" {
+		// 	fmt.Println("index:", s.Name)
+		// 	getIndexes(&config, &data)
+		// }
+	}
+}
+
+func dbOpen(db configfile.Host) (*database.Database, error) {
+	dbconn, err := database.OpenDatabase(database.Database{
+		Hostname: db.Hostname,
+		Port:     db.Port,
+		Driver:   db.Driver,
+		Database: db.Database,
+		Username: db.Username,
+		Password: db.Password,
+	})
+	return dbconn, err
+}
+
+func setupLogging(logName string) {
+	// logging
+	_, err := os.Stat(logName)
+	if os.IsNotExist(err) {
+		file, err := os.Create(logName)
+		ec.FatalErr(err)
+		defer file.Close()
+	}
+	err = os.Truncate(logName, 0)
+	ec.CheckErr(err)
+	cfg := zap.NewProductionConfig()
+	cfg.OutputPaths = []string{logName}
+	logger, _ := cfg.Build()
+	log = logger.Sugar()
+}
+
+func (config *Config) getDBConfigs(HostMap map[string]configfile.Host) (sourceDB, destDB configfile.Host) {
+	// =======
+	// source db
+	// =======
+	if config.Source == "" {
+		fmt.Println("no source specified")
+		os.Exit(0)
+	}
+	sourceDB = HostMap[config.Source]
+	if sourceDB.Hostname == "" {
+		fmt.Println("no source found")
+		os.Exit(0)
+	}
+
+	// =======
+	// dest DB
+	// =======
+	if config.Dest == "" {
+		fmt.Println("no destination specified")
+		os.Exit(0)
+	}
+	destDB = HostMap[config.Dest]
+	if destDB.Hostname == "" {
+		fmt.Println("no destination found")
+		os.Exit(0)
+	}
+	return
+}
+
+func (config *Config) checkParams() {
+	// =======
+	// check all or table,view,routine
+	// =======
+
+	if config.All {
+		config.Table = true
+		config.View = true
+		config.Routine = true
+	}
+
+	if (!config.Table && config.TableName == "") &&
+		(!config.View && config.ViewName == "") &&
+		(!config.Routine && config.RoutineName == "") &&
+		(!config.Index && config.IndexName == "") {
+		fmt.Println("table, view, routine, index, flags have to be selected")
+		os.Exit(0)
+	}
 }
 
 func getTables(config *Config, data *database.Conn) {
@@ -259,7 +296,6 @@ func getTables(config *Config, data *database.Conn) {
 		sTables, err = data.Source.GetTables(data.SSchema, "BASE TABLE", config.Timeout)
 		ec.CheckErr(err)
 	}
-	// fmt.Println("tables: ", len(sTables))
 
 	var tbls []string
 	for _, t := range sTables {

@@ -11,7 +11,7 @@ import (
 func (db *Database) GenTable(conn *Conn, table string, cols []Column, pkey []PKey) (sqld, sqlc string) {
 	clen := len(cols)
 	plen := len(pkey)
-	if conn.Source.Driver == "postgres" {
+	if conn.Source.Driver == "postgres" || conn.Source.Driver == "pgx" {
 		sqld += fmt.Sprintf("\nDROP TABLE IF EXISTS \"%s\".\"%s\" CASCADE;", conn.SSchema, table)
 		sqlc += fmt.Sprintf("\nCREATE TABLE IF NOT EXISTS \"%s\".\"%s\" (\n", conn.SSchema, table)
 		for k, c := range cols {
@@ -72,7 +72,7 @@ func (db *Database) GenTableIndexSQL(conn *Conn, tableName string) (sqld, sqlc s
 		idx := "\"" + strings.Replace(strings.Replace(i.Table+`_`+i.Columns+"_idx", "\"", "", -1), ",", "_", -1) + "\""
 		exists := ""
 		notexists := ""
-		if conn.Dest.Driver == "postgres" {
+		if conn.Dest.Driver == "postgres" || conn.Dest.Driver == "pgx" {
 			exists = "IF EXISTS "
 			notexists = "IF NOT EXISTS "
 		}
@@ -92,7 +92,7 @@ func (db *Database) GenLink(conn *Conn, table string, cols []Column, pkey []PKey
 		tmp = "temp"
 	}
 	clen := len(cols)
-	if conn.Dest.Driver == "postgres" {
+	if conn.Dest.Driver == "postgres" || conn.Dest.Driver == "pgx" {
 		sqld += fmt.Sprintf("\nDROP FOREIGN TABLE IF EXISTS \"%s\".\"%s%s\" CASCADE;\n", conn.DSchema, table, tmp)
 		sqlc += fmt.Sprintf("CREATE FOREIGN TABLE IF NOT EXISTS \"%s\".\"%s%s\" (\n", conn.DSchema, table, tmp)
 		for k, c := range cols {
@@ -150,7 +150,7 @@ func tableUpdProcStart(destDriver, schema, tableName string) (sqld, sqlc string)
 	} else {
 		tmp = "temp"
 	}
-	if destDriver == "postgres" {
+	if destDriver == "postgres" || destDriver == "pgx" {
 		sqld += fmt.Sprintf("\nDROP PROCEDURE IF EXISTS \"%s\".\"upd_%s\"();", schema, tableName)
 		sqlc += fmt.Sprintf("\nCREATE OR REPLACE PROCEDURE \"%s\".\"upd_%s\"()\nLANGUAGE plpgsql\nAS $procedure$\nBEGIN\n", schema, tableName)
 	} else if destDriver == "mssql" {
@@ -163,7 +163,7 @@ func tableUpdProcStart(destDriver, schema, tableName string) (sqld, sqlc string)
 }
 
 func tableUpdProcEnd(destDriver, tableName string) (sqlc string) {
-	if destDriver == "postgres" {
+	if destDriver == "postgres" || destDriver == "pgx" {
 		sqlc += "END\n$procedure$;\n"
 	} else if destDriver == "mssql" {
 		sqlc += fmt.Sprintf("IF OBJECT_ID('tempdb..#%s','U') IS NOT NULL DROP TABLE tempdb.#%s\n", tableName, tableName)
@@ -177,13 +177,13 @@ func tableDeleteSQL(destDriver, schema, tableName string, pkey []PKey, allColumn
 	if schema == "ep1" {
 		ttemp = "TEMP"
 	}
-	if destDriver == "postgres" {
+	if destDriver == "postgres" || destDriver == "pgx" {
 		sqlc += "DELETE\n"
 	} else if destDriver == "mssql" {
 		sqlc += fmt.Sprintf("DELETE \"%s\".\"%s\"\n", schema, tableName)
 	}
 	sqlc += fmt.Sprintf("FROM \"%s\".\"%s\"\n", schema, tableName)
-	if destDriver == "postgres" {
+	if destDriver == "postgres" || destDriver == "pgx" {
 		sqlc += fmt.Sprintf("USING \"%s\".\"%s\" AS d\n", schema, tableName)
 		sqlc += fmt.Sprintf("LEFT OUTER JOIN \"%s\".\"%s%s\" \"%s%s\" ON", schema, tableName, ttemp, tableName, ttemp)
 	} else if destDriver == "mssql" {
@@ -191,7 +191,7 @@ func tableDeleteSQL(destDriver, schema, tableName string, pkey []PKey, allColumn
 	}
 	plen := len(pkey)
 	for k, p := range pkey {
-		if destDriver == "postgres" {
+		if destDriver == "postgres" || destDriver == "pgx" {
 			sqlc += fmt.Sprintf("\nd.\"%s\" = \"%s%s\".\"%s\"", p.PKey, tableName, ttemp, p.PKey)
 		} else if destDriver == "mssql" {
 			sqlc += fmt.Sprintf("\n\"%s\".\"%s\" = \"%s%s\".\"%s\"", tableName, p.PKey, tableName, ttemp, p.PKey)
@@ -202,10 +202,10 @@ func tableDeleteSQL(destDriver, schema, tableName string, pkey []PKey, allColumn
 			sqlc += " AND "
 		}
 	}
-	if destDriver == "postgres" {
+	if destDriver == "postgres" || destDriver == "pgx" {
 		sqlc += "WHERE"
 	}
-	if destDriver == "postgres" {
+	if destDriver == "postgres" || destDriver == "pgx" {
 		for k, p := range pkey {
 			sqlc += fmt.Sprintf("\n\"%s\".\"%s\" = d.\"%s\" ", tableName, p.PKey, p.PKey)
 			if k == plen-1 {
@@ -215,7 +215,7 @@ func tableDeleteSQL(destDriver, schema, tableName string, pkey []PKey, allColumn
 			}
 		}
 	}
-	if destDriver == "postgres" {
+	if destDriver == "postgres" || destDriver == "pgx" {
 		sqlc += fmt.Sprintf("AND \"%s%s\".\"%s\" IS NULL;\n", tableName, ttemp, allColumns[0].ColumnName)
 
 	} else if destDriver == "mssql" {
@@ -241,12 +241,12 @@ func tableUpdateSQL(destDriver, schema, tableName string, pkey []PKey, columns [
 			sqlc += ","
 		}
 	}
-	if destDriver == "postgres" {
+	if destDriver == "postgres" || destDriver == "pgx" {
 		sqlc += fmt.Sprintf("\nFROM \"%s\".\"%s%s\" \"%s%s\"", schema, tableName, ttemp, tableName, ttemp)
 	} else if destDriver == "mssql" {
 		sqlc += fmt.Sprintf("\nFROM #%s \"%s%s\"", tableName, ttemp, tableName)
 	}
-	if destDriver == "postgres" {
+	if destDriver == "postgres" || destDriver == "pgx" {
 		sqlc += "\nWHERE"
 	} else if destDriver == "mssql" {
 		sqlc += fmt.Sprintf("\nJOIN \"%s\".\"%s\" ON", schema, tableName)
@@ -259,7 +259,7 @@ func tableUpdateSQL(destDriver, schema, tableName string, pkey []PKey, columns [
 			sqlc += " AND "
 		}
 	}
-	if destDriver == "postgres" {
+	if destDriver == "postgres" || destDriver == "pgx" {
 		sqlc += "AND ("
 	} else if destDriver == "mssql" {
 		sqlc += "WHERE ("
@@ -272,7 +272,7 @@ func tableUpdateSQL(destDriver, schema, tableName string, pkey []PKey, columns [
 			sqlc += " OR "
 		}
 	}
-	if destDriver == "postgres" {
+	if destDriver == "postgres" || destDriver == "pgx" {
 		sqlc += ");\n"
 	} else if destDriver == "mssql" {
 		sqlc += ")\n"
@@ -299,7 +299,7 @@ func tableInsertSQL(destDriver, schema, tableName string, pkey []PKey, allColumn
 		}
 	}
 	sqlc += fmt.Sprintf("FROM \"%s\".\"%s\"\n", schema, tableName)
-	if destDriver == "postgres" {
+	if destDriver == "postgres" || destDriver == "pgx" {
 		sqlc += fmt.Sprintf("RIGHT JOIN \"%s\".\"%s%s\" \"%s%s\" ON", schema, tableName, ttemp, tableName, ttemp)
 	} else if destDriver == "mssql" {
 		sqlc += fmt.Sprintf("RIGHT JOIN #%s \"%s%s\" ON", tableName, tableName, ttemp)
@@ -312,7 +312,7 @@ func tableInsertSQL(destDriver, schema, tableName string, pkey []PKey, allColumn
 			sqlc += " AND "
 		}
 	}
-	if destDriver == "postgres" {
+	if destDriver == "postgres" || destDriver == "pgx" {
 		sqlc += fmt.Sprintf("WHERE \"%s\".\"%s\" IS NULL;\n", tableName, allColumns[0].ColumnName)
 	} else if destDriver == "mssql" {
 		sqlc += fmt.Sprintf("WHERE \"%s\".\"%s\" IS NULL\n", tableName, allColumns[0].ColumnName)

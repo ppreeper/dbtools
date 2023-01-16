@@ -20,7 +20,7 @@ func (db *Database) GetSchemas(timeout int) ([]Schema, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 	q := ""
-	if db.Driver == "postgres" {
+	if db.Driver == "postgres" || db.Driver == "pgx" {
 		q = "select schema_name \"SCHEMA_NAME\" from information_schema.schemata where schema_name not in ('pg_catalog','information_schema') order by schema_name"
 	} else if db.Driver == "mssql" {
 		q = "select \"SCHEMA_NAME\" from INFORMATION_SCHEMA.SCHEMATA where SCHEMA_NAME not in ("
