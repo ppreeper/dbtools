@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/denisenkom/go-mssqldb v0.12.3
-	github.com/jackc/pgx/v4 v4.18.0
+	github.com/jackc/pgx/v4 v4.18.1
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/ppreeper/str v0.0.0-20221204064031-333e31c1a792
 	github.com/schollz/progressbar/v3 v3.13.1
