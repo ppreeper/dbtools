@@ -7,6 +7,10 @@ import (
 	ec "github.com/ppreeper/dbtools/pkg/errcheck"
 )
 
+//########
+// Generate
+//########
+
 // GenTable generate table craeation
 func (db *Database) GenTable(conn *Conn, table string, cols []Column, pkey []PKey) (sqld, sqlc string) {
 	clen := len(cols)

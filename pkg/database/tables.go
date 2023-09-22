@@ -8,9 +8,9 @@ import (
 	ec "github.com/ppreeper/dbtools/pkg/errcheck"
 )
 
-//////////
+//########
 // Tables
-//////////
+//########
 
 // Table list of tables
 type Table struct {

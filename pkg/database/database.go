@@ -11,6 +11,10 @@ import (
 	ec "github.com/ppreeper/dbtools/pkg/errcheck"
 )
 
+//########
+// Views
+//########
+
 // Database struct contains sql pointer
 type Database struct {
 	Name     string `json:"name,omitempty"`

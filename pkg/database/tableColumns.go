@@ -6,6 +6,10 @@ import (
 	"time"
 )
 
+//########
+// Table Columns
+//########
+
 // Column struct
 type Column struct {
 	Column     string `db:"CL"`

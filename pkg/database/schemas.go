@@ -6,9 +6,9 @@ import (
 	"time"
 )
 
-//////////
+//########
 // Schemas
-//////////
+//########
 
 // Schema struct to hold schemas
 type Schema struct {

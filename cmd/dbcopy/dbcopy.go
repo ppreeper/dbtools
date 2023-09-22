@@ -4,7 +4,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
+	"log/slog"
 	"os"
 	"regexp"
 	"strings"
@@ -16,7 +17,6 @@ import (
 	"github.com/ppreeper/str"
 	"github.com/schollz/progressbar/v3"
 
-	"go.uber.org/zap"
 	// _ "github.com/denisenkom/go-mssqldb"
 	// _ "github.com/fajran/go-monetdb" //Monet
 	// _ "github.com/jmoiron/sqlx"
@@ -29,7 +29,25 @@ import (
 	ec "github.com/ppreeper/dbtools/pkg/errcheck"
 )
 
-var log *zap.SugaredLogger
+var logger *slog.Logger
+
+func setupLogging(logName string) {
+	// check for file existence
+	_, err := os.Stat(logName)
+	if os.IsNotExist(err) {
+		file, err := os.Create(logName)
+		ec.FatalErr(err)
+		defer file.Close()
+	}
+	// if exists truncate file
+	err = os.Truncate(logName, 0)
+	ec.CheckErr(err)
+
+	f, err := os.OpenFile(logName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	ec.FatalErr(err)
+	logwriter := io.Writer(f)
+	logger = slog.New(slog.NewTextHandler(logwriter, nil))
+}
 
 type Config struct {
 	Source      string
@@ -102,7 +120,7 @@ func main() {
 	HostMap := configfile.GetConf(configFile)
 
 	// config options display
-	log.Infow("start", "config", config)
+	logger.Info("start", "config", config)
 
 	fmt.Println(str.RJustLen("Source:", 8), str.LJustLen(config.Source, 20), str.RJustLen("SSchemaName:", 13), str.LJustLen(config.SSchemaName, 20))
 	fmt.Println(str.RJustLen("Dest:", 8), str.LJustLen(config.Dest, 20), str.RJustLen("DSchemaName:", 13), str.LJustLen(config.DSchemaName, 20))
@@ -194,18 +212,18 @@ func main() {
 			fmt.Println("table:", s.Name)
 			getTables(&config, &data)
 		}
-		// if config.View || config.ViewName != "" {
-		// 	fmt.Println("view:", s.Name)
-		// 	getViews(&config, &data)
-		// }
-		// if config.Routine || config.RoutineName != "" {
-		// 	fmt.Println("routine:", s.Name)
-		// 	getRoutines(&config, &data)
-		// }
-		// if config.Index || config.IndexName != "" {
-		// 	fmt.Println("index:", s.Name)
-		// 	getIndexes(&config, &data)
-		// }
+		if config.View || config.ViewName != "" {
+			fmt.Println("view:", s.Name)
+			getViews(&config, &data)
+		}
+		if config.Routine || config.RoutineName != "" {
+			fmt.Println("routine:", s.Name)
+			getRoutines(&config, &data)
+		}
+		if config.Index || config.IndexName != "" {
+			fmt.Println("index:", s.Name)
+			getIndexes(&config, &data)
+		}
 	}
 }
 
@@ -219,22 +237,6 @@ func dbOpen(db configfile.Host) (*database.Database, error) {
 		Password: db.Password,
 	})
 	return dbconn, err
-}
-
-func setupLogging(logName string) {
-	// logging
-	_, err := os.Stat(logName)
-	if os.IsNotExist(err) {
-		file, err := os.Create(logName)
-		ec.FatalErr(err)
-		defer file.Close()
-	}
-	err = os.Truncate(logName, 0)
-	ec.CheckErr(err)
-	cfg := zap.NewProductionConfig()
-	cfg.OutputPaths = []string{logName}
-	logger, _ := cfg.Build()
-	log = logger.Sugar()
 }
 
 func (config *Config) getDBConfigs(HostMap map[string]configfile.Host) (sourceDB, destDB configfile.Host) {
@@ -459,7 +461,7 @@ func backupTasker(config *Config, data *database.Conn, objects []string) {
 					if config.Dest == "file:" {
 						fn := fmt.Sprintf("%s__t__%s.sql", data.DSchema, object)
 						osql := fmt.Sprintf("%s\n%s\n%s\n%s", dsql, disql, csql, cisql)
-						err := ioutil.WriteFile(fn, []byte(osql), 0666)
+						err := os.WriteFile(fn, []byte(osql), 0666)
 						ec.CheckErr(err)
 					} else {
 						ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.Timeout)*time.Second)
@@ -486,7 +488,7 @@ func backupTasker(config *Config, data *database.Conn, objects []string) {
 					if config.Dest == "file:" {
 						fn := fmt.Sprintf("%s__ft__%s.sql", data.DSchema, object)
 						osql := fmt.Sprintf("%s\n%s", dsql, csql)
-						err := ioutil.WriteFile(fn, []byte(osql), 0666)
+						err := os.WriteFile(fn, []byte(osql), 0666)
 						ec.CheckErr(err)
 					} else {
 						ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.Timeout)*time.Second)
@@ -508,7 +510,7 @@ func backupTasker(config *Config, data *database.Conn, objects []string) {
 					if config.Dest == "file:" {
 						fn := fmt.Sprintf("%s__upd_%s.sql", data.DSchema, object)
 						osql := fmt.Sprintf("%s\n%s", dsql, csql)
-						err := ioutil.WriteFile(fn, []byte(osql), 0666)
+						err := os.WriteFile(fn, []byte(osql), 0666)
 						ec.CheckErr(err)
 					} else {
 						ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.Timeout)*time.Second)
@@ -535,7 +537,7 @@ func backupTasker(config *Config, data *database.Conn, objects []string) {
 				} else {
 					if config.Dest == "file:" {
 						fn := fmt.Sprintf("%s__v__%s.sql", data.DSchema, object)
-						err := ioutil.WriteFile(fn, []byte(csql), 0666)
+						err := os.WriteFile(fn, []byte(csql), 0666)
 						ec.CheckErr(err)
 					} else {
 						ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.Timeout)*time.Second)
@@ -566,7 +568,7 @@ func backupTasker(config *Config, data *database.Conn, objects []string) {
 				} else {
 					if config.Dest == "file:" {
 						fn := fmt.Sprintf("%s__r__%s.sql", data.DSchema, object)
-						err := ioutil.WriteFile(fn, []byte(csql), 0666)
+						err := os.WriteFile(fn, []byte(csql), 0666)
 						ec.CheckErr(err)
 					} else {
 						ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.Timeout)*time.Second)
@@ -597,9 +599,9 @@ func backupTasker(config *Config, data *database.Conn, objects []string) {
 				} else {
 					if config.Dest == "file:" {
 						fn := fmt.Sprintf("%s__i__%s.sql", data.DSchema, object)
-						err := ioutil.WriteFile(fn, []byte(dsql), 0666)
+						err := os.WriteFile(fn, []byte(dsql), 0666)
 						ec.CheckErr(err)
-						err = ioutil.WriteFile(fn, []byte(csql), 0666)
+						err = os.WriteFile(fn, []byte(csql), 0666)
 						ec.CheckErr(err)
 					} else {
 						ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.Timeout)*time.Second)

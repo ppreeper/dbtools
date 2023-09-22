@@ -10,9 +10,9 @@ import (
 	ec "github.com/ppreeper/dbtools/pkg/errcheck"
 )
 
-//////////
+//########
 // Routines
-//////////
+//########
 
 // Routine list of routines (procedures, functions)
 type Routine struct {

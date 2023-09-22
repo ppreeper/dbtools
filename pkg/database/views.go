@@ -10,9 +10,9 @@ import (
 	ec "github.com/ppreeper/dbtools/pkg/errcheck"
 )
 
-//////////
+//########
 // Views
-//////////
+//########
 
 // View list of views
 type View struct {

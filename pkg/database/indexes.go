@@ -6,9 +6,9 @@ import (
 	"time"
 )
 
-//////////
+//########
 // Indexes
-//////////
+//########
 
 // Index list of Indexes
 type Index struct {
