@@ -15,9 +15,10 @@ import (
 func (db *Database) GenTable(conn *Conn, table string, cols []Column, pkey []PKey) (sqld, sqlc string) {
 	clen := len(cols)
 	plen := len(pkey)
-	if conn.Source.Driver == "postgres" || conn.Source.Driver == "pgx" {
-		sqld += fmt.Sprintf("\nDROP TABLE IF EXISTS \"%s\".\"%s\" CASCADE;", conn.SSchema, table)
-		sqlc += fmt.Sprintf("\nCREATE TABLE IF NOT EXISTS \"%s\".\"%s\" (\n", conn.SSchema, table)
+	switch conn.Dest.Driver {
+	case "postgres", "pgx":
+		sqld += fmt.Sprintf("\nDROP TABLE IF EXISTS \"%s\".\"%s\" CASCADE;", conn.DSchema, table)
+		sqlc += fmt.Sprintf("\nCREATE TABLE IF NOT EXISTS \"%s\".\"%s\" (\n", conn.DSchema, table)
 		for k, c := range cols {
 			if k == clen-1 {
 				if plen > 0 {
@@ -39,11 +40,11 @@ func (db *Database) GenTable(conn *Conn, table string, cols []Column, pkey []PKe
 			}
 		}
 		sqlc += ");\n"
-	} else if conn.Source.Driver == "mssql" {
-		sqld += fmt.Sprintf("\nDROP TABLE \"%s\".\"%s\";", conn.SSchema, table)
-		sqlc += fmt.Sprintf("\nCREATE TABLE \"%s\".\"%s\" (\n", conn.SSchema, table)
+	case "mssql":
+		sqld += fmt.Sprintf("\nDROP TABLE \"%s\".\"%s\";", conn.DSchema, table)
+		sqlc += fmt.Sprintf("\nCREATE TABLE \"%s\".\"%s\" (\n", conn.DSchema, table)
 		for k, c := range cols {
-			//fmt.Println(c)
+			// fmt.Println(c)
 			if k == clen-1 {
 				if plen > 0 {
 					sqlc += fmt.Sprintf("%s,\n", c.Column)
@@ -65,6 +66,9 @@ func (db *Database) GenTable(conn *Conn, table string, cols []Column, pkey []PKe
 			}
 		}
 		sqlc += ")\n"
+	default:
+		sqld = ""
+		sqlc = ""
 	}
 	return
 }
@@ -221,7 +225,6 @@ func tableDeleteSQL(destDriver, schema, tableName string, pkey []PKey, allColumn
 	}
 	if destDriver == "postgres" || destDriver == "pgx" {
 		sqlc += fmt.Sprintf("AND \"%s%s\".\"%s\" IS NULL;\n", tableName, ttemp, allColumns[0].ColumnName)
-
 	} else if destDriver == "mssql" {
 		sqlc += fmt.Sprintf("WHERE \"%s%s\".\"%s\" IS NULL\n", tableName, ttemp, allColumns[0].ColumnName)
 	}
