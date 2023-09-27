@@ -18,12 +18,13 @@ func main() {
 	ec.CheckErr(err)
 
 	// Flags
-	var configFile, dbase, stmt string
+	var configFile, dbase, stmt, fieldSep string
 	var timer bool
 
 	flag.StringVar(&configFile, "c", userConfigDir+"/dbtools/config.yml", "config.yml")
 	flag.StringVar(&dbase, "db", "", "database")
 	flag.StringVar(&stmt, "q", "", "sql query")
+	flag.StringVar(&fieldSep, "f", ";", "field seperator")
 	flag.BoolVar(&timer, "t", false, "sql timer")
 	flag.Parse()
 
@@ -67,9 +68,9 @@ func main() {
 	colNames, dataSet := queryData(sdb, stmt)
 	elapsed := time.Since(start)
 
-	printData(&colNames, &dataSet)
+	printData(&colNames, &dataSet, fieldSep)
 	if timer {
-		fmt.Printf("query: %s\ntime: %s\n", stmt, elapsed.String())
+		fmt.Printf("----------\nquery: %s\ntime: %s\n", stmt, elapsed.String())
 	}
 }
 
@@ -98,7 +99,7 @@ func queryData(sdb *database.Database, stmt string) (colNames []string, dataSet 
 	return
 }
 
-func printData(colNames *[]string, dataSet *[]any) {
+func printData(colNames *[]string, dataSet *[]any, fieldSep string) {
 	colLens := make([]int, len(*colNames))
 	for k, v := range *colNames {
 		if len(v) > colLens[k] {
@@ -119,8 +120,7 @@ func printData(colNames *[]string, dataSet *[]any) {
 	for k, v := range *colNames {
 		hdr += fmt.Sprintf("%v", str.LJustLen(v, colLens[k]))
 		if k < len(*colNames)-1 {
-			hdr += ";"
-			// fmt.Printf(";")
+			hdr += fieldSep
 		}
 	}
 	fmt.Println(hdr)
@@ -140,7 +140,7 @@ func printData(colNames *[]string, dataSet *[]any) {
 			}
 			line += str.LJustLen(vs, colLens[k])
 			if k < len(*colNames)-1 {
-				line += ";"
+				line += fieldSep
 			}
 		}
 		fmt.Println(line)
