@@ -25,50 +25,62 @@ type ViewList struct {
 }
 
 // GetViews returns list of views and definitions
-func (db *Database) GetViews(schema string, timeout int) ([]ViewList, error) {
+func (c *Conn) GetViews(schema string, timeout int) ([]ViewList, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 	q := ""
-	if db.Driver == "postgres" || db.Driver == "pgx" || db.Driver == "mssql" {
-		q += "SELECT TABLE_NAME \"TABLE_NAME\"" + "\n"
-		q += "FROM INFORMATION_SCHEMA.VIEWS" + "\n"
-		q += "WHERE TABLE_SCHEMA = '" + schema + "'" + "\n"
-		q += "ORDER BY TABLE_NAME" + "\n"
+	switch c.Source.Driver {
+	case "postgres", "pgx":
+		q += `SELECT TABLE_NAME AS "TABLE_NAME" 
+		FROM INFORMATION_SCHEMA.VIEWS 
+		WHERE TABLE_SCHEMA = $1 
+		ORDER BY TABLE_NAME`
+	case "mssql":
+		q += `SELECT TABLE_NAME AS "TABLE_NAME" 
+		FROM INFORMATION_SCHEMA.VIEWS 
+		WHERE TABLE_SCHEMA = ? 
+		ORDER BY TABLE_NAME`
 	}
-	// fmt.Println(q)
+
 	vv := []ViewList{}
-	if err := db.SelectContext(ctx, &vv, q); err != nil {
+	if err := c.Source.SelectContext(ctx, &vv, q, schema); err != nil {
 		return nil, fmt.Errorf("select: %w", err)
 	}
 	return vv, nil
 }
 
 // GetViewSchema returns views and definition
-func (db *Database) GetViewSchema(schema, view string) (View, error) {
+func (c *Conn) GetViewSchema(schema, view string) (View, error) {
 	q := ""
-	if db.Driver == "postgres" || db.Driver == "pgx" || db.Driver == "mssql" {
-		q += "SELECT TABLE_NAME \"TABLE_NAME\", VIEW_DEFINITION \"VIEW_DEFINITION\"" + "\n"
-		q += "FROM INFORMATION_SCHEMA.VIEWS" + "\n"
-		q += "WHERE TABLE_SCHEMA = '" + schema + "'" + "\n"
-		q += "AND TABLE_NAME = '" + view + "'" + "\n"
-		q += "ORDER BY TABLE_NAME" + "\n"
+	switch c.Source.Driver {
+	case "postgres", "pgx":
+		q += `SELECT TABLE_NAME AS "TABLE_NAME", VIEW_DEFINITION AS "VIEW_DEFINITION" 
+		FROM INFORMATION_SCHEMA.VIEWS 
+		WHERE TABLE_SCHEMA = $1 AND TABLE_NAME = $2 
+		ORDER BY TABLE_NAME`
+	case "mysql":
+		q += `SELECT TABLE_NAME AS "TABLE_NAME", VIEW_DEFINITION AS "VIEW_DEFINITION"
+		FROM INFORMATION_SCHEMA.VIEWS 
+		WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? 
+		ORDER BY TABLE_NAME`
 	}
 	vv := View{}
-	if err := db.Get(&vv, q); err != nil {
+	if err := c.Source.Get(&vv, q, schema, view); err != nil {
 		return View{}, fmt.Errorf("select: %w", err)
 	}
 	return vv, nil
 }
 
 // GetView gets view definition
-func (db *Database) GetView(d Database, schema string, view View, dbg bool) {
+func (c *Conn) GetView(d Database, schema string, view View, dbg bool) {
 	fmt.Printf("\n-- VIEW: %s.%s", schema, view.Name)
 	q := ""
-	if d.Driver == "postgres" || d.Driver == "pgx" {
+	switch d.Driver {
+	case "postgres", "pgx":
 		q += "DROP VIEW " + schema + "." + view.Name + ";\n"
 		q += "CREATE VIEW " + schema + "." + view.Name + " AS \n"
 		q += view.Definition
-	} else if d.Driver == "mssql" {
+	case "mssql":
 		q += view.Definition + "\n"
 	}
 

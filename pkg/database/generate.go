@@ -11,18 +11,23 @@ import (
 // Generate
 //########
 
-// GenTable generate table craeation
-func (db *Database) GenTable(conn *Conn, table string, cols []Column, pkey []PKey) (sqld, sqlc string) {
+// GenTable generate table creation
+func (c *Conn) GenTables(table string, cols []Column, pkey []PKey) (sqld, sqlc string) {
 	clen := len(cols)
 	plen := len(pkey)
-	switch conn.Dest.Driver {
+	switch c.Dest.Driver {
 	case "postgres", "pgx":
-		sqld += fmt.Sprintf("\nDROP TABLE IF EXISTS \"%s\".\"%s\" CASCADE;", conn.DSchema, table)
-		sqlc += fmt.Sprintf("\nCREATE TABLE IF NOT EXISTS \"%s\".\"%s\" (\n", conn.DSchema, table)
+		sqld += fmt.Sprintf("\nDROP TABLE IF EXISTS \"%s\".\"%s\" CASCADE;", c.DSchema, table)
+		sqlc += fmt.Sprintf("\nCREATE TABLE IF NOT EXISTS \"%s\".\"%s\" (\n", c.DSchema, table)
 		for k, c := range cols {
+			cdefault := ""
+			if c.ColumnDefault != "" {
+				cdefault += " DEFAULT " + strings.ReplaceAll(c.ColumnDefault, "getdate()", "CURRENT_TIMESTAMP")
+			}
+			sqlc += fmt.Sprintf("\"%s\" %s %s%s", c.ColumnName, c.DataType, c.IsNullable, cdefault)
 			if k == clen-1 {
 				if plen > 0 {
-					sqlc += c.Column + ",\n"
+					sqlc += ",\n"
 					sqlc += "PRIMARY KEY ("
 					for v, p := range pkey {
 						if v == plen-1 {
@@ -33,21 +38,20 @@ func (db *Database) GenTable(conn *Conn, table string, cols []Column, pkey []PKe
 					}
 					sqlc += ")" + "\n"
 				} else {
-					sqlc += c.Column + "\n"
+					sqlc += "\n"
 				}
 			} else {
-				sqlc += c.Column + ",\n"
+				sqlc += ",\n"
 			}
 		}
 		sqlc += ");\n"
 	case "mssql":
-		sqld += fmt.Sprintf("\nDROP TABLE \"%s\".\"%s\";", conn.DSchema, table)
-		sqlc += fmt.Sprintf("\nCREATE TABLE \"%s\".\"%s\" (\n", conn.DSchema, table)
+		sqld += fmt.Sprintf("\nDROP TABLE \"%s\".\"%s\";", c.DSchema, table)
+		sqlc += fmt.Sprintf("\nCREATE TABLE \"%s\".\"%s\" (\n", c.DSchema, table)
 		for k, c := range cols {
-			// fmt.Println(c)
 			if k == clen-1 {
 				if plen > 0 {
-					sqlc += fmt.Sprintf("%s,\n", c.Column)
+					sqlc += fmt.Sprintf("%s,\n", c.ColumnName)
 					sqlc += "PRIMARY KEY ("
 					for v, p := range pkey {
 						if v == plen-1 {
@@ -59,10 +63,10 @@ func (db *Database) GenTable(conn *Conn, table string, cols []Column, pkey []PKe
 					sqlc += ")\n"
 				} else {
 					// q += c.Column + "\n"
-					sqlc += fmt.Sprintf("%s\n", c.Column)
+					sqlc += fmt.Sprintf("%s\n", c.ColumnName)
 				}
 			} else {
-				sqlc += fmt.Sprintf("%s,\n", c.Column)
+				sqlc += fmt.Sprintf("%s,\n", c.ColumnName)
 			}
 		}
 		sqlc += ")\n"
@@ -73,26 +77,30 @@ func (db *Database) GenTable(conn *Conn, table string, cols []Column, pkey []PKe
 	return
 }
 
-func (db *Database) GenTableIndexSQL(conn *Conn, tableName string) (sqld, sqlc string) {
-	idxs, err := conn.Source.GetTableIndexSchema(conn.SSchema, tableName)
+// GenTableIndexSQL generate table index sql
+func (c *Conn) GenTableIndexSQL(tableName string) (sqld, sqlc string) {
+	idxs, err := c.GetTableIndexSchema(tableName)
 	ec.CheckErr(err)
 	for _, i := range idxs {
 		idx := "\"" + strings.Replace(strings.Replace(i.Table+`_`+i.Columns+"_idx", "\"", "", -1), ",", "_", -1) + "\""
 		exists := ""
 		notexists := ""
-		if conn.Dest.Driver == "postgres" || conn.Dest.Driver == "pgx" {
+		switch c.Dest.Driver {
+		case "postgres", "pgx":
 			exists = "IF EXISTS "
 			notexists = "IF NOT EXISTS "
+		default:
+			exists = ""
+			notexists = ""
 		}
-
-		sqld += `DROP INDEX ` + exists + `"` + i.Schema + `".` + idx + `;` + "\n"
-		sqlc += `CREATE INDEX ` + notexists + `` + idx + ` ON "` + i.Schema + `"."` + i.Table + `" (` + i.Columns + `);` + "\n"
+		sqld += `DROP INDEX ` + exists + `"` + c.DSchema + `".` + idx + `;` + "\n"
+		sqlc += `CREATE INDEX ` + notexists + `` + idx + ` ON "` + c.DSchema + `"."` + i.Table + `" (` + i.Columns + `);` + "\n"
 	}
 	return
 }
 
 // GenLink generate table creation
-func (db *Database) GenLink(conn *Conn, table string, cols []Column, pkey []PKey) (sqld, sqlc string) {
+func (c *Conn) GenLink(table string, cols []Column, pkey []PKey) (sqld, sqlc string) {
 	tmp := ""
 	if table == strings.ToUpper(table) {
 		tmp = "TEMP"
@@ -100,24 +108,24 @@ func (db *Database) GenLink(conn *Conn, table string, cols []Column, pkey []PKey
 		tmp = "temp"
 	}
 	clen := len(cols)
-	if conn.Dest.Driver == "postgres" || conn.Dest.Driver == "pgx" {
-		sqld += fmt.Sprintf("\nDROP FOREIGN TABLE IF EXISTS \"%s\".\"%s%s\" CASCADE;\n", conn.DSchema, table, tmp)
-		sqlc += fmt.Sprintf("CREATE FOREIGN TABLE IF NOT EXISTS \"%s\".\"%s%s\" (\n", conn.DSchema, table, tmp)
+	if c.Dest.Driver == "postgres" || c.Dest.Driver == "pgx" {
+		sqld += fmt.Sprintf("\nDROP FOREIGN TABLE IF EXISTS \"%s\".\"%s%s\" CASCADE;\n", c.DSchema, table, tmp)
+		sqlc += fmt.Sprintf("CREATE FOREIGN TABLE IF NOT EXISTS \"%s\".\"%s%s\" (\n", c.DSchema, table, tmp)
 		for k, c := range cols {
 			if k == clen-1 {
-				sqlc += fmt.Sprintf("%s\n", c.Column)
+				sqlc += fmt.Sprintf("%s\n", c.ColumnName)
 			} else {
-				sqlc += fmt.Sprintf("%s,\n", c.Column)
+				sqlc += fmt.Sprintf("%s,\n", c.ColumnName)
 			}
 		}
 		sqlc += ")\n"
-		sqlc += fmt.Sprintf("SERVER %s \nOPTIONS (", conn.Source.Name)
-		sqlc += fmt.Sprintf("table_name '%s.%s', ", conn.SSchema, table)
+		sqlc += fmt.Sprintf("SERVER %s \nOPTIONS (", c.Source.Name)
+		sqlc += fmt.Sprintf("table_name '%s.%s', ", c.SSchema, table)
 		sqlc += "row_estimate_method 'showplan_all', "
 		sqlc += "match_column_names '0');\n"
-	} else if conn.Dest.Driver == "mssql" {
-		sqld += fmt.Sprintf("\nDROP VIEW \"%s\".\"%s%s\";\n", conn.DSchema, table, tmp)
-		sqlc += fmt.Sprintf("CREATE VIEW \"%s\".\"%s%s\" AS\nSELECT\n", conn.DSchema, table, tmp)
+	} else if c.Dest.Driver == "mssql" {
+		sqld += fmt.Sprintf("\nDROP VIEW \"%s\".\"%s%s\";\n", c.DSchema, table, tmp)
+		sqlc += fmt.Sprintf("CREATE VIEW \"%s\".\"%s%s\" AS\nSELECT\n", c.DSchema, table, tmp)
 		for k, c := range cols {
 			collation := ""
 			if c.DataType == "CHAR" ||
@@ -132,22 +140,22 @@ func (db *Database) GenLink(conn *Conn, table string, cols []Column, pkey []PKey
 				sqlc += fmt.Sprintf("\"%s\" %s\"%s\",\n", c.ColumnName, collation, c.ColumnName)
 			}
 		}
-		sqlc += fmt.Sprintf("FROM \"%s\".\"%s\".\"%s\".\"%s\";\n", conn.Source.Hostname, conn.Source.Database, conn.SSchema, table)
+		sqlc += fmt.Sprintf("FROM \"%s\".\"%s\".\"%s\".\"%s\";\n", c.Source.Hostname, c.Source.Database, c.SSchema, table)
 	}
 	return sqld, sqlc
 }
 
 // GenUpdate generate update procedure
-func (db *Database) GenUpdate(conn *Conn, table string, cols []Column, pkey []PKey) (sqld, sqlc string) {
+func (c *Conn) GenUpdate(table string, cols []Column, pkey []PKey) (sqld, sqlc string) {
 	columns := trimCols(cols, pkey)
 
-	sqld, sqlc = tableUpdProcStart(conn.Dest.Driver, conn.DSchema, table)
-	sqlc += tableDeleteSQL(conn.Dest.Driver, conn.DSchema, table, pkey, cols)
+	sqld, sqlc = tableUpdProcStart(c.Dest.Driver, c.DSchema, table)
+	sqlc += tableDeleteSQL(c.Dest.Driver, c.DSchema, table, pkey, cols)
 	if len(pkey) != len(cols) {
-		sqlc += tableUpdateSQL(conn.Dest.Driver, conn.DSchema, table, pkey, columns)
+		sqlc += tableUpdateSQL(c.Dest.Driver, c.DSchema, table, pkey, columns)
 	}
-	sqlc += tableInsertSQL(conn.Dest.Driver, conn.DSchema, table, pkey, cols)
-	sqlc += tableUpdProcEnd(conn.Dest.Driver, table)
+	sqlc += tableInsertSQL(c.Dest.Driver, c.DSchema, table, pkey, cols)
+	sqlc += tableUpdProcEnd(c.Dest.Driver, table)
 	return
 }
 

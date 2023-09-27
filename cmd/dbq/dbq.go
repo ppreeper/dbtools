@@ -17,7 +17,7 @@ func main() {
 	userConfigDir, err := os.UserConfigDir()
 	ec.CheckErr(err)
 
-	// flags
+	// Flags
 	var configFile, dbase, stmt string
 	var timer bool
 
@@ -87,7 +87,7 @@ func queryData(sdb *database.Database, stmt string) (colNames []string, dataSet 
 	}
 
 	for rows.Next() {
-		var rowMap = make(map[string]any)
+		rowMap := make(map[string]any)
 		err = rows.Scan(colPtrs...)
 		ec.FatalErr(err)
 		for i, col := range cols {

@@ -31,8 +31,6 @@ func trimCols(cols []Column, pkey []PKey) []Column {
 			}
 		}
 	}
-	// fmt.Println(clist)
-	// fmt.Println(ilist)
 
 	var collist []int
 	for _, c := range clist {
@@ -47,12 +45,10 @@ func trimCols(cols []Column, pkey []PKey) []Column {
 			collist = append(collist, c)
 		}
 	}
-	// fmt.Println(collist)
 
 	var columns []Column
 	for _, c := range collist {
 		columns = append(columns, cols[c])
 	}
-	// fmt.Println(columns)
 	return columns
 }

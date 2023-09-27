@@ -8,13 +8,13 @@ import (
 	"log/slog"
 	"os"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/ppreeper/dbtools/pkg/configfile"
 	"github.com/ppreeper/dbtools/pkg/database"
 	"github.com/ppreeper/str"
-	"github.com/schollz/progressbar/v3"
 
 	// _ "github.com/denisenkom/go-mssqldb"
 	// _ "github.com/fajran/go-monetdb" //Monet
@@ -167,7 +167,7 @@ func main() {
 		}
 		sSchemas = []database.Schema{s}
 	}
-	fmt.Println("schemas: ", sSchemas)
+	logger.Info("", "schemas", sSchemas)
 
 	dSchemas, err := ddb.GetSchemas(config.Timeout)
 	ec.CheckErr(err)
@@ -186,10 +186,10 @@ func main() {
 		}
 		dSchemas = []database.Schema{s}
 	}
-	fmt.Println("schemas: ", dSchemas)
+	logger.Info("", "schemas", dSchemas)
 
 	for _, s := range sSchemas {
-		fmt.Println(s)
+		logger.Info("", "schema", s)
 		var DSchema string
 		if config.Dest == "file:" {
 			DSchema = s.Name
@@ -205,24 +205,24 @@ func main() {
 			SSchema: s.Name,
 			DSchema: DSchema,
 		}
-		fmt.Println(data.SSchema, data.DSchema)
+		logger.Info("schemas", "source", data.SSchema, "dest", data.DSchema)
 
 		if config.Table || config.TableName != "" {
-			fmt.Println("table:", s.Name)
+			logger.Info("tables", "table", s.Name)
 			getTables(&config, &data)
 		}
-		// if config.View || config.ViewName != "" {
-		// 	fmt.Println("view:", s.Name)
-		// 	getViews(&config, &data)
-		// }
-		// if config.Routine || config.RoutineName != "" {
-		// 	fmt.Println("routine:", s.Name)
-		// 	getRoutines(&config, &data)
-		// }
-		// if config.Index || config.IndexName != "" {
-		// 	fmt.Println("index:", s.Name)
-		// 	getIndexes(&config, &data)
-		// }
+		if config.View || config.ViewName != "" {
+			logger.Info("views", "view", s.Name)
+			getViews(&config, &data)
+		}
+		if config.Routine || config.RoutineName != "" {
+			logger.Info("routines", "routine", s.Name)
+			getRoutines(&config, &data)
+		}
+		if config.Index || config.IndexName != "" {
+			logger.Info("indexs", "index", s.Name)
+			getIndexes(&config, &data)
+		}
 	}
 }
 
@@ -304,7 +304,7 @@ func getTables(config *Config, data *database.Conn) {
 			tbls = append(tbls, t.Name)
 		}
 	}
-	fmt.Println("sTables: ", len(sTables), "tables: ", len(tbls))
+	logger.Info("sTables", "count", len(sTables), "tables", len(tbls))
 
 	cTable := config.Table
 	cLink := config.Link
@@ -317,8 +317,7 @@ func getTables(config *Config, data *database.Conn) {
 	// config.Routine = false
 
 	if len(tbls) > 0 {
-		fmt.Println("jobCount:", config.JobCount)
-		fmt.Println(tbls)
+		logger.Info("tables", "tables", tbls)
 		backupTasker(config, data, tbls)
 	}
 
@@ -335,10 +334,9 @@ func getViews(config *Config, data *database.Conn) {
 	if config.ViewName != "" {
 		sViews = []database.ViewList{{Name: config.ViewName}}
 	} else {
-		sViews, err = data.Source.GetViews(data.SSchema, config.Timeout)
+		sViews, err = data.GetViews(data.SSchema, config.Timeout)
 		ec.CheckErr(err)
 	}
-	// fmt.Println("views: ", len(sViews))
 
 	var views []string
 	for _, t := range sViews {
@@ -346,7 +344,7 @@ func getViews(config *Config, data *database.Conn) {
 			views = append(views, t.Name)
 		}
 	}
-	// fmt.Println("sViews: ", len(sViews), "views: ", len(views))
+	logger.Info("sViews", "count", len(sViews), "tables", len(views))
 
 	cTable := config.Table
 	cLink := config.Link
@@ -359,7 +357,7 @@ func getViews(config *Config, data *database.Conn) {
 	config.Routine = false
 
 	if len(views) > 0 {
-		// fmt.Println("jobCount:", config.JobCount)
+		logger.Info("views", "views", views)
 		backupTasker(config, data, views)
 	}
 
@@ -376,10 +374,9 @@ func getRoutines(config *Config, data *database.Conn) {
 	if config.RoutineName != "" {
 		sRoutines = []database.RoutineList{{Name: config.RoutineName}}
 	} else {
-		sRoutines, err = data.Source.GetRoutines(data.SSchema, config.Timeout)
+		sRoutines, err = data.GetRoutines(data.SSchema, config.Timeout)
 		ec.CheckErr(err)
 	}
-	// fmt.Println("routines: ", len(sRoutines))
 
 	var routines []string
 	for _, t := range sRoutines {
@@ -387,7 +384,7 @@ func getRoutines(config *Config, data *database.Conn) {
 			routines = append(routines, t.Name)
 		}
 	}
-	// fmt.Println("sRoutines: ", len(sRoutines), "tables: ", len(routines))
+	logger.Info("sRoutines", "count", len(sRoutines), "tables", len(routines))
 
 	cTable := config.Table
 	cLink := config.Link
@@ -400,7 +397,7 @@ func getRoutines(config *Config, data *database.Conn) {
 	config.Routine = true
 
 	if len(routines) > 0 {
-		// fmt.Println("jobCount:", config.JobCount)
+		logger.Info("routines", "routines", routines)
 		backupTasker(config, data, routines)
 	}
 
@@ -417,10 +414,9 @@ func getIndexes(config *Config, data *database.Conn) {
 	if config.RoutineName != "" {
 		sIndexes = []database.IndexList{{Name: config.IndexName}}
 	} else {
-		sIndexes, err = data.Source.GetIndexes(data.SSchema, config.Timeout)
+		sIndexes, err = data.GetIndexes(data.SSchema, config.Timeout)
 		ec.CheckErr(err)
 	}
-	// fmt.Println("routines: ", len(sIndexes))
 
 	var indexes []string
 	for _, t := range sIndexes {
@@ -428,30 +424,27 @@ func getIndexes(config *Config, data *database.Conn) {
 			indexes = append(indexes, t.Name)
 		}
 	}
-	// fmt.Println("sIndexes: ", len(sIndexes), "tables: ", len(indexes))
+	logger.Info("sIndexes", "count", len(sIndexes), "tables", len(indexes))
 
 	if len(indexes) > 0 {
-		// fmt.Println("jobCount:", config.JobCount)
+		logger.Info("indexes", "indexes", indexes)
 		backupTasker(config, data, indexes)
 	}
 }
 
 func backupTasker(config *Config, data *database.Conn, objects []string) {
-	// fmt.Println("backupTasker")
 	sem := make(chan int, config.JobCount)
 	var wg sync.WaitGroup
 	wg.Add(len(objects))
-	bar := progressbar.Default(int64(len(objects)))
+	// bar := progressbar.Default(int64(len(objects)))
 	for _, object := range objects {
-		fmt.Println(object)
-		go func(sem chan int, wg *sync.WaitGroup, bar *progressbar.ProgressBar, config *Config, data *database.Conn, object string) {
-			defer bar.Add(1)
+		// go func(sem chan int, wg *sync.WaitGroup, bar *progressbar.ProgressBar, config *Config, data *database.Conn, object string) {
+		go func(sem chan int, wg *sync.WaitGroup, config *Config, data *database.Conn, object string) {
+			// defer bar.Add(1)
 			defer wg.Done()
 			sem <- 1
 
 			if config.Table {
-				// fundamentally wrong GetTableShemaa needs to be at the conn level
-				// because the data returned depend on the source and dest drivers
 				dsql, csql, disql, cisql := data.GetTableSchema(object, config.Timeout)
 				if config.Debug {
 					fmt.Println(dsql)
@@ -459,6 +452,10 @@ func backupTasker(config *Config, data *database.Conn, objects []string) {
 					fmt.Println(csql)
 					fmt.Println(cisql)
 				} else {
+					logger.Info("sql", "dsql", dsql)
+					logger.Info("sql", "disql", disql)
+					logger.Info("sql", "csql", csql)
+					logger.Info("sql", "cisql", cisql)
 					if config.Dest == "file:" {
 						fn := fmt.Sprintf("%s__t__%s.sql", data.DSchema, object)
 						osql := fmt.Sprintf("%s\n%s\n%s\n%s", dsql, disql, csql, cisql)
@@ -480,143 +477,144 @@ func backupTasker(config *Config, data *database.Conn, objects []string) {
 
 			}
 
-			// if config.Link && data.Dest.Driver == "postgres" {
-			// 	dsql, csql := data.Source.GetForeignTableSchema(data, object, config.Timeout)
-			// 	if config.Debug {
-			// 		fmt.Println(dsql)
-			// 		fmt.Println(csql)
-			// 	} else {
-			// 		if config.Dest == "file:" {
-			// 			fn := fmt.Sprintf("%s__ft__%s.sql", data.DSchema, object)
-			// 			osql := fmt.Sprintf("%s\n%s", dsql, csql)
-			// 			err := os.WriteFile(fn, []byte(osql), 0o666)
-			// 			ec.CheckErr(err)
-			// 		} else {
-			// 			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.Timeout)*time.Second)
-			// 			defer cancel()
-			// 			_, err := data.Dest.ExecContext(ctx, dsql)
-			// 			ec.CheckErr(err)
-			// 			_, err = data.Dest.ExecContext(ctx, csql)
-			// 			ec.CheckErr(err)
-			// 		}
-			// 	}
-			// }
-			//
-			// if config.Update {
-			// 	dsql, csql := data.Source.GetUpdateTableSchema(data, object, config.Timeout)
-			// 	if config.Debug {
-			// 		fmt.Println(dsql)
-			// 		fmt.Println(csql)
-			// 	} else {
-			// 		if config.Dest == "file:" {
-			// 			fn := fmt.Sprintf("%s__upd_%s.sql", data.DSchema, object)
-			// 			osql := fmt.Sprintf("%s\n%s", dsql, csql)
-			// 			err := os.WriteFile(fn, []byte(osql), 0o666)
-			// 			ec.CheckErr(err)
-			// 		} else {
-			// 			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.Timeout)*time.Second)
-			// 			defer cancel()
-			// 			_, err := data.Dest.ExecContext(ctx, dsql)
-			// 			ec.CheckErr(err)
-			// 			_, err = data.Dest.ExecContext(ctx, csql)
-			// 			ec.CheckErr(err)
-			// 		}
-			// 	}
-			// }
-			//
-			// if config.View {
-			// 	vsql, err := data.Source.GetViewSchema(data.SSchema, object)
-			// 	ec.CheckErr(err)
-			// 	csql := ""
-			// 	if data.Dest.Driver == "postgres" {
-			// 		csql += fmt.Sprintf("CREATE OR REPLACE VIEW \"%s\".\"%s\" AS\n", data.DSchema, vsql.Name)
-			// 	}
-			// 	csql += vsql.Definition
-			//
-			// 	if config.Debug {
-			// 		fmt.Println(csql)
-			// 	} else {
-			// 		if config.Dest == "file:" {
-			// 			fn := fmt.Sprintf("%s__v__%s.sql", data.DSchema, object)
-			// 			err := os.WriteFile(fn, []byte(csql), 0o666)
-			// 			ec.CheckErr(err)
-			// 		} else {
-			// 			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.Timeout)*time.Second)
-			// 			defer cancel()
-			// 			_, err := data.Dest.ExecContext(ctx, csql)
-			// 			ec.CheckErr(err)
-			// 		}
-			// 	}
-			// }
-			//
-			// if config.Routine {
-			// 	rsql, err := data.Source.GetRoutineSchema(data.SSchema, object)
-			// 	ec.CheckErr(err)
-			// 	csql := ""
-			// 	if data.Dest.Driver == "postgres" {
-			// 		csql = fmt.Sprintf("CREATE OR REPLACE %s \"%s\".\"%s\"", rsql.Type, data.DSchema, rsql.Name)
-			// 		csql += fmt.Sprintf("() \nLANGUAGE %s\nAS $%s$", rsql.ExternalLanguage, strings.ToLower(rsql.Type))
-			// 	}
-			//
-			// 	csql += rsql.Definition
-			//
-			// 	if data.Dest.Driver == "postgres" {
-			// 		csql += fmt.Sprintf("$%s$\n;", strings.ToLower(rsql.Type))
-			// 	}
-			//
-			// 	if config.Debug {
-			// 		fmt.Println(csql)
-			// 	} else {
-			// 		if config.Dest == "file:" {
-			// 			fn := fmt.Sprintf("%s__r__%s.sql", data.DSchema, object)
-			// 			err := os.WriteFile(fn, []byte(csql), 0o666)
-			// 			ec.CheckErr(err)
-			// 		} else {
-			// 			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.Timeout)*time.Second)
-			// 			defer cancel()
-			// 			_, err := data.Dest.ExecContext(ctx, csql)
-			// 			ec.CheckErr(err)
-			// 		}
-			// 	}
-			// }
-			//
-			// if config.Index {
-			// 	rsql, err := data.Source.GetIndexSchema(data.SSchema, object)
-			// 	ec.CheckErr(err)
-			// 	idx := "\"" + strings.Replace(strings.Replace(rsql.Table+`_`+rsql.Columns+"_idx", "\"", "", -1), ",", "_", -1) + "\""
-			// 	exists := ""
-			// 	notexists := ""
-			// 	if data.Dest.Driver == "postgres" {
-			// 		exists = "IF EXISTS "
-			// 		notexists = "IF NOT EXISTS "
-			// 	}
-			//
-			// 	dsql := `DROP INDEX ` + exists + `"` + rsql.Schema + `".` + idx + `;`
-			// 	csql := `CREATE INDEX ` + notexists + `` + idx + ` ON "` + rsql.Schema + `"."` + rsql.Table + `" (` + rsql.Columns + `);`
-			//
-			// 	if config.Debug {
-			// 		fmt.Println(dsql)
-			// 		fmt.Println(csql)
-			// 	} else {
-			// 		if config.Dest == "file:" {
-			// 			fn := fmt.Sprintf("%s__i__%s.sql", data.DSchema, object)
-			// 			err := os.WriteFile(fn, []byte(dsql), 0o666)
-			// 			ec.CheckErr(err)
-			// 			err = os.WriteFile(fn, []byte(csql), 0o666)
-			// 			ec.CheckErr(err)
-			// 		} else {
-			// 			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.Timeout)*time.Second)
-			// 			defer cancel()
-			// 			_, err := data.Dest.ExecContext(ctx, dsql)
-			// 			ec.CheckErr(err)
-			// 			_, err = data.Dest.ExecContext(ctx, csql)
-			// 			ec.CheckErr(err)
-			// 		}
-			// 	}
-			// }
+			if config.Link && data.Dest.Driver == "postgres" {
+				dsql, csql := data.GetForeignTableSchema(object, config.Timeout)
+				if config.Debug {
+					fmt.Println(dsql)
+					fmt.Println(csql)
+				} else {
+					if config.Dest == "file:" {
+						fn := fmt.Sprintf("%s__ft__%s.sql", data.DSchema, object)
+						osql := fmt.Sprintf("%s\n%s", dsql, csql)
+						err := os.WriteFile(fn, []byte(osql), 0o666)
+						ec.CheckErr(err)
+					} else {
+						ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.Timeout)*time.Second)
+						defer cancel()
+						_, err := data.Dest.ExecContext(ctx, dsql)
+						ec.CheckErr(err)
+						_, err = data.Dest.ExecContext(ctx, csql)
+						ec.CheckErr(err)
+					}
+				}
+			}
+
+			if config.Update {
+				dsql, csql := data.GetUpdateTableSchema(object, config.Timeout)
+				if config.Debug {
+					fmt.Println(dsql)
+					fmt.Println(csql)
+				} else {
+					if config.Dest == "file:" {
+						fn := fmt.Sprintf("%s__upd_%s.sql", data.DSchema, object)
+						osql := fmt.Sprintf("%s\n%s", dsql, csql)
+						err := os.WriteFile(fn, []byte(osql), 0o666)
+						ec.CheckErr(err)
+					} else {
+						ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.Timeout)*time.Second)
+						defer cancel()
+						_, err := data.Dest.ExecContext(ctx, dsql)
+						ec.CheckErr(err)
+						_, err = data.Dest.ExecContext(ctx, csql)
+						ec.CheckErr(err)
+					}
+				}
+			}
+
+			if config.View {
+				vsql, err := data.GetViewSchema(data.SSchema, object)
+				ec.CheckErr(err)
+				csql := ""
+				if data.Dest.Driver == "postgres" {
+					csql += fmt.Sprintf("CREATE OR REPLACE VIEW \"%s\".\"%s\" AS\n", data.DSchema, vsql.Name)
+				}
+				csql += vsql.Definition
+
+				if config.Debug {
+					fmt.Println(csql)
+				} else {
+					if config.Dest == "file:" {
+						fn := fmt.Sprintf("%s__v__%s.sql", data.DSchema, object)
+						err := os.WriteFile(fn, []byte(csql), 0o666)
+						ec.CheckErr(err)
+					} else {
+						ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.Timeout)*time.Second)
+						defer cancel()
+						_, err := data.Dest.ExecContext(ctx, csql)
+						ec.CheckErr(err)
+					}
+				}
+			}
+
+			if config.Routine {
+				rsql, err := data.GetRoutineSchema(data.SSchema, object)
+				ec.CheckErr(err)
+				csql := ""
+				if data.Dest.Driver == "postgres" {
+					csql = fmt.Sprintf("CREATE OR REPLACE %s \"%s\".\"%s\"", rsql.Type, data.DSchema, rsql.Name)
+					csql += fmt.Sprintf("() \nLANGUAGE %s\nAS $%s$", rsql.ExternalLanguage, strings.ToLower(rsql.Type))
+				}
+
+				csql += rsql.Definition
+
+				if data.Dest.Driver == "postgres" {
+					csql += fmt.Sprintf("$%s$\n;", strings.ToLower(rsql.Type))
+				}
+
+				if config.Debug {
+					fmt.Println(csql)
+				} else {
+					if config.Dest == "file:" {
+						fn := fmt.Sprintf("%s__r__%s.sql", data.DSchema, object)
+						err := os.WriteFile(fn, []byte(csql), 0o666)
+						ec.CheckErr(err)
+					} else {
+						ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.Timeout)*time.Second)
+						defer cancel()
+						_, err := data.Dest.ExecContext(ctx, csql)
+						ec.CheckErr(err)
+					}
+				}
+			}
+
+			if config.Index {
+				rsql, err := data.GetIndexSchema(data.SSchema, object)
+				ec.CheckErr(err)
+				idx := "\"" + strings.Replace(strings.Replace(rsql.Table+`_`+rsql.Columns+"_idx", "\"", "", -1), ",", "_", -1) + "\""
+				exists := ""
+				notexists := ""
+				if data.Dest.Driver == "postgres" {
+					exists = "IF EXISTS "
+					notexists = "IF NOT EXISTS "
+				}
+
+				dsql := `DROP INDEX ` + exists + `"` + rsql.Schema + `".` + idx + `;`
+				csql := `CREATE INDEX ` + notexists + `` + idx + ` ON "` + rsql.Schema + `"."` + rsql.Table + `" (` + rsql.Columns + `);`
+
+				if config.Debug {
+					fmt.Println(dsql)
+					fmt.Println(csql)
+				} else {
+					if config.Dest == "file:" {
+						fn := fmt.Sprintf("%s__i__%s.sql", data.DSchema, object)
+						err := os.WriteFile(fn, []byte(dsql), 0o666)
+						ec.CheckErr(err)
+						err = os.WriteFile(fn, []byte(csql), 0o666)
+						ec.CheckErr(err)
+					} else {
+						ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.Timeout)*time.Second)
+						defer cancel()
+						_, err := data.Dest.ExecContext(ctx, dsql)
+						ec.CheckErr(err)
+						_, err = data.Dest.ExecContext(ctx, csql)
+						ec.CheckErr(err)
+					}
+				}
+			}
 
 			<-sem
-		}(sem, &wg, bar, config, data, object)
+			// }(sem, &wg, bar, config, data, object)
+		}(sem, &wg, config, data, object)
 	}
 	wg.Wait()
 }

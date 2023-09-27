@@ -11,277 +11,117 @@ import (
 //########
 
 // Column struct
+//
+//	type Column struct {
+//		Column     string `db:"CL"`
+//		ColumnName string `db:"CN"`
+//		DataType   string `db:"DT"`
+//	}
 type Column struct {
-	Column     string `db:"CL"`
-	ColumnName string `db:"CN"`
-	DataType   string `db:"DT"`
+	ColumnName    string `db:"COLUMN_NAME"`
+	IsNullable    string `db:"IS_NULLABLE"`
+	ColumnDefault string `db:"COLUMN_DEFAULT"`
+	DataType      string `db:"DATA_TYPE"`
 }
 
-func (c *Conn) GetColumnDetail(t string, debug bool, timeout int) ([]Column, error) {
+func (c *Conn) GetColumnDetail(t string, timeout int) ([]Column, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 	q := ""
+	q += `SELECT C.COLUMN_NAME AS "COLUMN_NAME"
+	,CASE WHEN IS_NULLABLE = 'NO' THEN 'NOT NULL' ELSE '' END AS "IS_NULLABLE"`
 	switch c.Source.Driver {
 	case "mssql":
 		switch c.Dest.Driver {
 		case "mssql":
-			q += "SELECT\n"
-			q += "'\"' + C.COLUMN_NAME + '\" ' +\n"
-			q += "CASE UPPER(DATA_TYPE)\n"
-			q += "WHEN 'CHAR' THEN 'CHAR' + '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH)+')'\n"
-			q += "WHEN 'NCHAR' THEN 'CHAR' + '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH)+')'\n"
-			q += "WHEN 'VARCHAR' THEN CASE WHEN C.CHARACTER_MAXIMUM_LENGTH < 0 then 'TEXT' ELSE 'VARCHAR' + '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH)+')' END\n"
-			q += "WHEN 'NVARCHAR' THEN CASE WHEN C.CHARACTER_MAXIMUM_LENGTH < 0 then 'TEXT' ELSE 'VARCHAR'+ '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH)+')' END\n"
-			q += "WHEN 'CHARACTER' THEN 'CHARACTER' + '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH)+')'\n"
-			q += "WHEN 'CHARACTER VARYING' THEN CASE WHEN C.CHARACTER_MAXIMUM_LENGTH < 0 then 'TEXT' ELSE 'CHARACTER VARYING'+ '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH)+')' END\n"
-			q += "WHEN 'TINYINT' THEN 'TINYINT'\n"
-			q += "WHEN 'SMALLINT' THEN 'SMALLINT'\n"
-			q += "WHEN 'INT' THEN 'INT'\n"
-			q += "WHEN 'DECIMAL' THEN 'DECIMAL' + '(' + CONVERT(VARCHAR,C.NUMERIC_PRECISION) + ',' + CONVERT(VARCHAR,C.NUMERIC_SCALE) + ')'\n"
-			q += "WHEN 'NUMERIC' THEN 'NUMERIC' + '(' + CONVERT(VARCHAR,C.NUMERIC_PRECISION) + ',' + CONVERT(VARCHAR,C.NUMERIC_SCALE) + ')'\n"
-			q += "WHEN 'FLOAT' THEN 'FLOAT' + CASE WHEN C.NUMERIC_PRECISION < 53 THEN '(' + CONVERT(VARCHAR,C.NUMERIC_PRECISION) + ')' ELSE '' END\n"
-			q += "WHEN 'VARBINARY' THEN 'VARBINARY'\n"
-			q += "WHEN 'DATETIME' THEN 'DATETIME'\n"
-			q += "ELSE DATA_TYPE\n"
-			q += "END + ' ' +\n"
-			q += "CASE WHEN IS_NULLABLE = 'NO' THEN 'NOT NULL' ELSE '' END + ' ' +\n"
-			q += "CASE WHEN C.COLUMN_DEFAULT IS NULL THEN ''\n"
-			q += "ELSE ' DEFAULT ' + SUBSTRING(C.COLUMN_DEFAULT,CHARINDEX(' as ', C.COLUMN_DEFAULT)+4,LEN(C.COLUMN_DEFAULT)-CHARINDEX(' as ', C.COLUMN_DEFAULT)) END\n"
-			q += "\"CL\", C.COLUMN_NAME \"CN\", UPPER(DATA_TYPE) \"DT\"\n"
-			q += fmt.Sprintf("FROM %s.INFORMATION_SCHEMA.COLUMNS C\n", c.Source.Database)
-			q += "WHERE C.TABLE_CATALOG = ?\n"
-			q += "AND C.TABLE_SCHEMA = ?\n"
-			q += "AND C.TABLE_NAME = ?\n"
-			q += "ORDER BY ORDINAL_POSITION;\n;"
+			q += `,COALESCE (C.COLUMN_DEFAULT,'') AS "COLUMN_DEFAULT"`
+			q += `,CASE UPPER(DATA_TYPE)
+			WHEN 'CHAR' THEN 'CHAR' + '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH)+')'
+			WHEN 'NCHAR' THEN 'CHAR' + '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH)+')'
+			WHEN 'VARCHAR' THEN CASE WHEN C.CHARACTER_MAXIMUM_LENGTH < 0 then 'TEXT' ELSE 'VARCHAR' + '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH)+')' END
+			WHEN 'NVARCHAR' THEN CASE WHEN C.CHARACTER_MAXIMUM_LENGTH < 0 then 'TEXT' ELSE 'VARCHAR'+ '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH)+')' END
+			WHEN 'CHARACTER' THEN 'CHARACTER' + '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH)+')'
+			WHEN 'CHARACTER VARYING' THEN CASE WHEN C.CHARACTER_MAXIMUM_LENGTH < 0 then 'TEXT' ELSE 'CHARACTER VARYING'+ '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH)+')' END
+			WHEN 'TINYINT' THEN 'TINYINT'
+			WHEN 'SMALLINT' THEN 'SMALLINT'
+			WHEN 'INT' THEN 'INT'
+			WHEN 'DECIMAL' THEN 'DECIMAL' + '(' + CONVERT(VARCHAR,C.NUMERIC_PRECISION) + ',' + CONVERT(VARCHAR,C.NUMERIC_SCALE) + ')'
+			WHEN 'NUMERIC' THEN 'NUMERIC' + '(' + CONVERT(VARCHAR,C.NUMERIC_PRECISION) + ',' + CONVERT(VARCHAR,C.NUMERIC_SCALE) + ')'
+			WHEN 'FLOAT' THEN 'FLOAT' + CASE WHEN C.NUMERIC_PRECISION < 53 THEN '(' + CONVERT(VARCHAR,C.NUMERIC_PRECISION) + ')' ELSE '' END
+			WHEN 'VARBINARY' THEN 'VARBINARY'
+			WHEN 'DATETIME' THEN 'DATETIME'
+			ELSE UPPER(DATA_TYPE) END AS "DATA_TYPE"`
 		case "postgres", "pgx":
-			q += "SELECT\n"
-			q += "'\"' + C.COLUMN_NAME + '\" ' +\n"
-			q += "CASE UPPER(DATA_TYPE)\n"
-			q += "WHEN 'CHAR' THEN 'CHARACTER' + '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH)+')'\n"
-			q += "WHEN 'NCHAR' THEN 'CHARACTER' + '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH)+')'\n"
-			q += "WHEN 'VARCHAR' THEN CASE WHEN C.CHARACTER_MAXIMUM_LENGTH < 0 then 'TEXT' ELSE 'CHARACTER VARYING' + '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH)+')' END\n"
-			q += "WHEN 'NVARCHAR' THEN CASE WHEN C.CHARACTER_MAXIMUM_LENGTH < 0 then 'TEXT' ELSE 'CHARACTER VARYING'+ '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH)+')' END\n"
-			q += "WHEN 'CHARACTER' THEN 'CHARACTER' + '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH) + ')'\n"
-			q += "WHEN 'CHARACTER VARYING' THEN CASE WHEN C.CHARACTER_MAXIMUM_LENGTH < 0 then 'TEXT' ELSE 'CHARACTER VARYING'+ '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH)+')' END\n"
-			q += "WHEN 'TINYINT' THEN 'SMALLINT'\n"
-			q += "WHEN 'SMALLINT' THEN 'SMALLINT'\n"
-			q += "WHEN 'INT' THEN 'INT'\n"
-			q += "WHEN 'DECIMAL' THEN 'NUMERIC' + '(' + CONVERT(VARCHAR,C.NUMERIC_PRECISION) + ',' + CONVERT(VARCHAR,C.NUMERIC_SCALE) + ')'\n"
-			q += "WHEN 'NUMERIC' THEN 'NUMERIC' + '(' + CONVERT(VARCHAR,C.NUMERIC_PRECISION) + ',' + CONVERT(VARCHAR,C.NUMERIC_SCALE) + ')'\n"
-			q += "WHEN 'FLOAT' THEN 'DOUBLE PRECISION' + CASE WHEN C.NUMERIC_PRECISION < 53 THEN '(' + CONVERT(VARCHAR,C.NUMERIC_PRECISION) + ')' ELSE '' END\n"
-			q += "WHEN 'DOUBLE PRECISION' THEN 'DOUBLE PRECISION' + CASE WHEN C.NUMERIC_PRECISION < 53 THEN '(' + CONVERT(VARCHAR,C.NUMERIC_PRECISION) + ')' ELSE '' END\n"
-			q += "WHEN 'VARBINARY' THEN 'BYTEA'\n"
-			q += "WHEN 'DATETIME' THEN 'TIMESTAMP'\n"
-			q += "ELSE DATA_TYPE\n"
-			q += "END + ' ' +\n"
-			q += "CASE WHEN IS_NULLABLE = 'NO' THEN 'NOT NULL' ELSE '' END + ' ' +\n"
-			q += "CASE WHEN C.COLUMN_DEFAULT IS NULL THEN ''\n"
-			q += "ELSE ' DEFAULT ' + substring(C.COLUMN_DEFAULT,CASE WHEN CHARINDEX(' as ', C.COLUMN_DEFAULT) = 0 then 0 else CHARINDEX(' as ', C.COLUMN_DEFAULT)+4 end,LEN(C.COLUMN_DEFAULT)+1-CASE WHEN CHARINDEX(' as ', C.COLUMN_DEFAULT) = 0 then 0 else CHARINDEX(' as ', C.COLUMN_DEFAULT) end) END\n"
-			q += "\"CL\", C.COLUMN_NAME \"CN\", UPPER(DATA_TYPE) \"DT\"\n"
-			q += fmt.Sprintf("FROM %s.INFORMATION_SCHEMA.COLUMNS C\n", c.Source.Database)
-			q += "WHERE C.TABLE_CATALOG = ?\n"
-			q += "AND C.TABLE_SCHEMA = ?\n"
-			q += "AND C.TABLE_NAME = ?\n"
-			q += "ORDER BY ORDINAL_POSITION;\n;"
+			q += `,COALESCE(C.COLUMN_DEFAULT+CASE UPPER(DATA_TYPE) WHEN 'BIT' then '::bit' end,'') AS "COLUMN_DEFAULT"`
+			q += `,CASE UPPER(DATA_TYPE)
+			WHEN 'CHAR' THEN 'CHARACTER' + '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH)+')'
+			WHEN 'NCHAR' THEN 'CHARACTER' + '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH)+')'
+			WHEN 'VARCHAR' THEN CASE WHEN C.CHARACTER_MAXIMUM_LENGTH < 0 then 'TEXT' ELSE 'CHARACTER VARYING' + '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH)+')' END
+			WHEN 'NVARCHAR' THEN CASE WHEN C.CHARACTER_MAXIMUM_LENGTH < 0 then 'TEXT' ELSE 'CHARACTER VARYING'+ '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH)+')' END
+			WHEN 'CHARACTER' THEN 'CHARACTER' + '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH) + ')'
+			WHEN 'CHARACTER VARYING' THEN CASE WHEN C.CHARACTER_MAXIMUM_LENGTH < 0 then 'TEXT' ELSE 'CHARACTER VARYING'+ '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH)+')' END
+			WHEN 'BIT' THEN 'BIT(1)'
+			WHEN 'TINYINT' THEN 'SMALLINT'
+			WHEN 'SMALLINT' THEN 'SMALLINT'
+			WHEN 'INT' THEN 'INT'
+			WHEN 'DECIMAL' THEN 'NUMERIC' + '(' + CONVERT(VARCHAR,C.NUMERIC_PRECISION) + ',' + CONVERT(VARCHAR,C.NUMERIC_SCALE) + ')'
+			WHEN 'NUMERIC' THEN 'NUMERIC' + '(' + CONVERT(VARCHAR,C.NUMERIC_PRECISION) + ',' + CONVERT(VARCHAR,C.NUMERIC_SCALE) + ')'
+			WHEN 'FLOAT' THEN 'DOUBLE PRECISION' + CASE WHEN C.NUMERIC_PRECISION < 53 THEN '(' + CONVERT(VARCHAR,C.NUMERIC_PRECISION) + ')' ELSE '' END
+			WHEN 'DOUBLE PRECISION' THEN 'DOUBLE PRECISION' + CASE WHEN C.NUMERIC_PRECISION < 53 THEN '(' + CONVERT(VARCHAR,C.NUMERIC_PRECISION) + ')' ELSE '' END
+			WHEN 'VARBINARY' THEN 'BYTEA'
+			WHEN 'DATETIME' THEN 'TIMESTAMP'
+			WHEN 'UNIQUEIDENTIFIER' THEN 'UUID'
+			ELSE UPPER(DATA_TYPE) END AS "DATA_TYPE"`
 		}
+		q += `FROM INFORMATION_SCHEMA.COLUMNS C
+		WHERE C.TABLE_CATALOG = ? AND C.TABLE_SCHEMA = ? AND C.TABLE_NAME = ?
+		ORDER BY C.TABLE_CATALOG,C.TABLE_SCHEMA,C.TABLE_NAME,ORDINAL_POSITION;`
 	case "postgres", "pgx":
+		q += `,COALESCE (C.COLUMN_DEFAULT,'') AS "COLUMN_DEFAULT"`
 		switch c.Dest.Driver {
 		case "mssql":
-			q += "SELECT\n"
-			q += "'\"' || C.COLUMN_NAME || '\" ' ||\n"
-			q += "CASE UPPER(DATA_TYPE)\n"
-			q += "WHEN 'CHAR' THEN 'CHAR' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END \n"
-			q += "WHEN 'NCHAR' THEN 'CHAR' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END \n"
-			q += "WHEN 'VARCHAR' THEN 'VARCHAR' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END \n"
-			q += "WHEN 'NVARCHAR' THEN 'VARCHAR' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END \n"
-			q += "WHEN 'CHARACTER' THEN 'CHAR' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END \n"
-			q += "WHEN 'CHARACTER VARYING' THEN 'VARCHAR' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END \n"
-			q += "WHEN 'TINYINT' THEN 'TINYINT'\n"
-			q += "WHEN 'SMALLINT' THEN 'SMALLINT'\n"
-			q += "WHEN 'INT' THEN 'INT'\n"
-			q += "WHEN 'DECIMAL' THEN 'DECIMAL' || case when C.NUMERIC_PRECISION::character varying IS NULL THEN '' ELSE '(' || C.NUMERIC_PRECISION::character varying || ',' || C.NUMERIC_SCALE::character varying || ')' END\n"
-			q += "WHEN 'NUMERIC' THEN 'DECIMAL' || case when C.NUMERIC_PRECISION::character varying IS NULL THEN '' ELSE '(' || C.NUMERIC_PRECISION::character varying || ',' || C.NUMERIC_SCALE::character varying || ')' END\n"
-			q += "WHEN 'FLOAT' THEN 'FLOAT' || CASE WHEN C.NUMERIC_PRECISION < 53 THEN '(' || C.NUMERIC_PRECISION::character varying || ')' ELSE '' end\n"
-			q += "WHEN 'DOUBLE PRECISION' THEN 'FLOAT' || CASE WHEN C.NUMERIC_PRECISION < 53 THEN '(' || C.NUMERIC_PRECISION::character varying || ')' ELSE '' END\n"
-			q += "WHEN 'VARBINARY' THEN 'VARBINARY'\n"
-			q += "WHEN 'BYTEA' THEN 'VARBINARY'\n"
-			q += "WHEN 'DATETIME' THEN 'DATETIME'\n"
-			q += "ELSE DATA_TYPE\n"
-			q += "END || ' ' ||\n"
-			q += "CASE WHEN IS_NULLABLE = 'NO' THEN 'NOT NULL' ELSE '' END || ' ' ||\n"
-			q += "CASE WHEN C.COLUMN_DEFAULT IS NULL THEN ''\n"
-			q += "ELSE ' DEFAULT ' || case when POSITION('::' in C.COLUMN_DEFAULT) > 0 then SUBSTRING(C.COLUMN_DEFAULT,1,POSITION('::' in C.COLUMN_DEFAULT)-1) else C.COLUMN_DEFAULT END end\n"
-			q += fmt.Sprintf("FROM %s.INFORMATION_SCHEMA.COLUMNS C\n", c.Source.Database)
-			q += "WHERE C.TABLE_CATALOG = $1\n"
-			q += "AND C.TABLE_SCHEMA = $2\n"
-			q += "AND C.TABLE_NAME = $3'\n"
-			q += "ORDER BY ORDINAL_POSITION;\n;"
+			q += `,CASE UPPER(DATA_TYPE)
+			WHEN 'CHAR' THEN 'CHAR' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END 
+			WHEN 'NCHAR' THEN 'CHAR' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END 
+			WHEN 'VARCHAR' THEN 'VARCHAR' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END 
+			WHEN 'NVARCHAR' THEN 'VARCHAR' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END 
+			WHEN 'CHARACTER' THEN 'CHAR' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END 
+			WHEN 'CHARACTER VARYING' THEN 'VARCHAR' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END 
+			WHEN 'TINYINT' THEN 'TINYINT'
+			WHEN 'SMALLINT' THEN 'SMALLINT'
+			WHEN 'INT' THEN 'INT'
+			WHEN 'DECIMAL' THEN 'DECIMAL' || case when C.NUMERIC_PRECISION::character varying IS NULL THEN '' ELSE '(' || C.NUMERIC_PRECISION::character varying || ',' || C.NUMERIC_SCALE::character varying || ')' END
+			WHEN 'NUMERIC' THEN 'DECIMAL' || case when C.NUMERIC_PRECISION::character varying IS NULL THEN '' ELSE '(' || C.NUMERIC_PRECISION::character varying || ',' || C.NUMERIC_SCALE::character varying || ')' END
+			WHEN 'FLOAT' THEN 'FLOAT' || CASE WHEN C.NUMERIC_PRECISION < 53 THEN '(' || C.NUMERIC_PRECISION::character varying || ')' ELSE '' end
+			WHEN 'DOUBLE PRECISION' THEN 'FLOAT' || CASE WHEN C.NUMERIC_PRECISION < 53 THEN '(' || C.NUMERIC_PRECISION::character varying || ')' ELSE '' END
+			WHEN 'VARBINARY' THEN 'VARBINARY'
+			WHEN 'BYTEA' THEN 'VARBINARY'
+			WHEN 'DATETIME' THEN 'DATETIME'
+			ELSE UPPER(DATA_TYPE) END AS "DATA_TYPE"`
 		case "postgres", "pgx":
-			q += "SELECT\n"
-			q += "'\"' || C.COLUMN_NAME || '\" ' ||\n"
-			q += "CASE UPPER(DATA_TYPE)\n"
-			q += "WHEN 'CHAR' THEN 'CHAR' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END \n"
-			q += "WHEN 'NCHAR' THEN 'CHAR' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END \n"
-			q += "WHEN 'VARCHAR' THEN 'VARCHAR' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END \n"
-			q += "WHEN 'NVARCHAR' THEN 'VARCHAR' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END \n"
-			q += "WHEN 'CHARACTER' THEN 'CHARACTER' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END \n"
-			q += "WHEN 'CHARACTER VARYING' THEN 'CHARACTER VARYING' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END \n"
-			q += "WHEN 'TINYINT' THEN 'TINYINT'\n"
-			q += "WHEN 'SMALLINT' THEN 'SMALLINT'\n"
-			q += "WHEN 'INT' THEN 'INT'\n"
-			q += "WHEN 'DECIMAL' THEN 'DECIMAL' || case when C.NUMERIC_PRECISION::character varying IS NULL THEN '' ELSE '(' || C.NUMERIC_PRECISION::character varying || ',' || C.NUMERIC_SCALE::character varying || ')' END\n"
-			q += "WHEN 'NUMERIC' THEN 'NUMERIC' || case when C.NUMERIC_PRECISION::character varying IS NULL THEN '' ELSE '(' || C.NUMERIC_PRECISION::character varying || ',' || C.NUMERIC_SCALE::character varying || ')' END\n"
-			q += "WHEN 'FLOAT' THEN 'FLOAT' || CASE WHEN C.NUMERIC_PRECISION < 53 THEN '(' || C.NUMERIC_PRECISION::character varying || ')' ELSE '' END\n"
-			q += "WHEN 'VARBINARY' THEN 'VARBINARY'\n"
-			q += "WHEN 'DATETIME' THEN 'DATETIME'\n"
-			q += "ELSE DATA_TYPE\n"
-			q += "END || ' ' ||\n"
-			q += "CASE WHEN IS_NULLABLE = 'NO' THEN 'NOT NULL' ELSE '' END || ' ' ||\n"
-			q += "CASE WHEN C.COLUMN_DEFAULT IS NULL THEN ''\n"
-			q += "ELSE ' DEFAULT ' || C.COLUMN_DEFAULT END\n"
-			q += "\"CL\", C.COLUMN_NAME \"CN\", UPPER(DATA_TYPE) \"DT\"\n"
-			q += fmt.Sprintf("FROM %s.INFORMATION_SCHEMA.COLUMNS C\n", c.Source.Database)
-			q += "WHERE C.TABLE_CATALOG = $1\n"
-			q += "AND C.TABLE_SCHEMA = $2\n"
-			q += "AND C.TABLE_NAME = $3'\n"
-			q += "ORDER BY ORDINAL_POSITION;\n;"
+			q += `,CASE UPPER(DATA_TYPE)
+			WHEN 'CHAR' THEN 'CHAR' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END 
+			WHEN 'NCHAR' THEN 'CHAR' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END 
+			WHEN 'VARCHAR' THEN 'VARCHAR' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END 
+			WHEN 'NVARCHAR' THEN 'VARCHAR' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END 
+			WHEN 'CHARACTER' THEN 'CHARACTER' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END 
+			WHEN 'CHARACTER VARYING' THEN 'CHARACTER VARYING' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END 
+			WHEN 'TINYINT' THEN 'TINYINT'
+			WHEN 'SMALLINT' THEN 'SMALLINT'
+			WHEN 'INT' THEN 'INT'
+			WHEN 'DECIMAL' THEN 'DECIMAL' || case when C.NUMERIC_PRECISION::character varying IS NULL THEN '' ELSE '(' || C.NUMERIC_PRECISION::character varying || ',' || C.NUMERIC_SCALE::character varying || ')' END
+			WHEN 'NUMERIC' THEN 'NUMERIC' || case when C.NUMERIC_PRECISION::character varying IS NULL THEN '' ELSE '(' || C.NUMERIC_PRECISION::character varying || ',' || C.NUMERIC_SCALE::character varying || ')' END
+			WHEN 'FLOAT' THEN 'FLOAT' || CASE WHEN C.NUMERIC_PRECISION < 53 THEN '(' || C.NUMERIC_PRECISION::character varying || ')' ELSE '' END
+			WHEN 'VARBINARY' THEN 'VARBINARY'
+			WHEN 'DATETIME' THEN 'DATETIME'
+			ELSE UPPER(DATA_TYPE) END AS "DATA_TYPE"`
 		}
-	}
-	if debug {
-		fmt.Println(q)
+		q += `FROM INFORMATION_SCHEMA.COLUMNS C
+		WHERE C.TABLE_CATALOG = $1 AND C.TABLE_SCHEMA = $2 AND C.TABLE_NAME = $3
+		ORDER BY C.TABLE_CATALOG,C.TABLE_SCHEMA,C.TABLE_NAME,ORDINAL_POSITION;`
 	}
 	columnnames := []Column{}
 	if err := c.Source.SelectContext(ctx, &columnnames, q, c.Source.Database, c.SSchema, t); err != nil {
-		return nil, fmt.Errorf("select: %v", err)
-	}
-	return columnnames, nil
-}
-
-// GetColumnDetail func
-func (db *Database) GetColumnDetail(conn *Conn, t string, debug bool, timeout int) ([]Column, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
-	defer cancel()
-	q := ""
-	if conn.Source.Driver == "mssql" {
-		if conn.Dest.Driver == "mssql" {
-			q += "-- mssql to mssql\n"
-			q += "SELECT\n"
-			q += "'\"' + C.COLUMN_NAME + '\" ' +\n"
-			q += "CASE UPPER(DATA_TYPE)\n"
-			q += "WHEN 'CHAR' THEN 'CHAR' + '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH)+')'\n"
-			q += "WHEN 'NCHAR' THEN 'CHAR' + '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH)+')'\n"
-			q += "WHEN 'VARCHAR' THEN CASE WHEN C.CHARACTER_MAXIMUM_LENGTH < 0 then 'TEXT' ELSE 'VARCHAR' + '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH)+')' END\n"
-			q += "WHEN 'NVARCHAR' THEN CASE WHEN C.CHARACTER_MAXIMUM_LENGTH < 0 then 'TEXT' ELSE 'VARCHAR'+ '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH)+')' END\n"
-			q += "WHEN 'CHARACTER' THEN 'CHARACTER' + '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH)+')'\n"
-			q += "WHEN 'CHARACTER VARYING' THEN CASE WHEN C.CHARACTER_MAXIMUM_LENGTH < 0 then 'TEXT' ELSE 'CHARACTER VARYING'+ '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH)+')' END\n"
-			q += "WHEN 'TINYINT' THEN 'TINYINT'\n"
-			q += "WHEN 'SMALLINT' THEN 'SMALLINT'\n"
-			q += "WHEN 'INT' THEN 'INT'\n"
-			q += "WHEN 'DECIMAL' THEN 'DECIMAL' + '(' + CONVERT(VARCHAR,C.NUMERIC_PRECISION) + ',' + CONVERT(VARCHAR,C.NUMERIC_SCALE) + ')'\n"
-			q += "WHEN 'NUMERIC' THEN 'NUMERIC' + '(' + CONVERT(VARCHAR,C.NUMERIC_PRECISION) + ',' + CONVERT(VARCHAR,C.NUMERIC_SCALE) + ')'\n"
-			q += "WHEN 'FLOAT' THEN 'FLOAT' + CASE WHEN C.NUMERIC_PRECISION < 53 THEN '(' + CONVERT(VARCHAR,C.NUMERIC_PRECISION) + ')' ELSE '' END\n"
-			q += "WHEN 'VARBINARY' THEN 'VARBINARY'\n"
-			q += "WHEN 'DATETIME' THEN 'DATETIME'\n"
-			q += "ELSE DATA_TYPE\n"
-			q += "END + ' ' +\n"
-			q += "CASE WHEN IS_NULLABLE = 'NO' THEN 'NOT NULL' ELSE '' END + ' ' +\n"
-			q += "CASE WHEN C.COLUMN_DEFAULT IS NULL THEN ''\n"
-			q += "ELSE ' DEFAULT ' + SUBSTRING(C.COLUMN_DEFAULT,CHARINDEX(' as ', C.COLUMN_DEFAULT)+4,LEN(C.COLUMN_DEFAULT)-CHARINDEX(' as ', C.COLUMN_DEFAULT)) END\n"
-			q += "\"CL\", C.COLUMN_NAME \"CN\", UPPER(DATA_TYPE) \"DT\"\n"
-		} else if conn.Dest.Driver == "postgres" || conn.Dest.Driver == "pgx" {
-			q += "-- mssql to pgsql\n"
-			q += "SELECT\n"
-			q += "'\"' + C.COLUMN_NAME + '\" ' +\n"
-			q += "CASE UPPER(DATA_TYPE)\n"
-			q += "WHEN 'CHAR' THEN 'CHARACTER' + '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH)+')'\n"
-			q += "WHEN 'NCHAR' THEN 'CHARACTER' + '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH)+')'\n"
-			q += "WHEN 'VARCHAR' THEN CASE WHEN C.CHARACTER_MAXIMUM_LENGTH < 0 then 'TEXT' ELSE 'CHARACTER VARYING' + '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH)+')' END\n"
-			q += "WHEN 'NVARCHAR' THEN CASE WHEN C.CHARACTER_MAXIMUM_LENGTH < 0 then 'TEXT' ELSE 'CHARACTER VARYING'+ '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH)+')' END\n"
-			q += "WHEN 'CHARACTER' THEN 'CHARACTER' + '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH) + ')'\n"
-			q += "WHEN 'CHARACTER VARYING' THEN CASE WHEN C.CHARACTER_MAXIMUM_LENGTH < 0 then 'TEXT' ELSE 'CHARACTER VARYING'+ '(' + CONVERT(VARCHAR,C.CHARACTER_MAXIMUM_LENGTH)+')' END\n"
-			q += "WHEN 'TINYINT' THEN 'SMALLINT'\n"
-			q += "WHEN 'SMALLINT' THEN 'SMALLINT'\n"
-			q += "WHEN 'INT' THEN 'INT'\n"
-			q += "WHEN 'DECIMAL' THEN 'NUMERIC' + '(' + CONVERT(VARCHAR,C.NUMERIC_PRECISION) + ',' + CONVERT(VARCHAR,C.NUMERIC_SCALE) + ')'\n"
-			q += "WHEN 'NUMERIC' THEN 'NUMERIC' + '(' + CONVERT(VARCHAR,C.NUMERIC_PRECISION) + ',' + CONVERT(VARCHAR,C.NUMERIC_SCALE) + ')'\n"
-			q += "WHEN 'FLOAT' THEN 'DOUBLE PRECISION' + CASE WHEN C.NUMERIC_PRECISION < 53 THEN '(' + CONVERT(VARCHAR,C.NUMERIC_PRECISION) + ')' ELSE '' END\n"
-			q += "WHEN 'DOUBLE PRECISION' THEN 'DOUBLE PRECISION' + CASE WHEN C.NUMERIC_PRECISION < 53 THEN '(' + CONVERT(VARCHAR,C.NUMERIC_PRECISION) + ')' ELSE '' END\n"
-			q += "WHEN 'VARBINARY' THEN 'BYTEA'\n"
-			q += "WHEN 'DATETIME' THEN 'TIMESTAMP'\n"
-			q += "ELSE DATA_TYPE\n"
-			q += "END + ' ' +\n"
-			q += "CASE WHEN IS_NULLABLE = 'NO' THEN 'NOT NULL' ELSE '' END + ' ' +\n"
-			q += "CASE WHEN C.COLUMN_DEFAULT IS NULL THEN ''\n"
-			q += "ELSE ' DEFAULT ' + substring(C.COLUMN_DEFAULT,CASE WHEN CHARINDEX(' as ', C.COLUMN_DEFAULT) = 0 then 0 else CHARINDEX(' as ', C.COLUMN_DEFAULT)+4 end,LEN(C.COLUMN_DEFAULT)+1-CASE WHEN CHARINDEX(' as ', C.COLUMN_DEFAULT) = 0 then 0 else CHARINDEX(' as ', C.COLUMN_DEFAULT) end) END\n"
-			q += "\"CL\", C.COLUMN_NAME \"CN\", UPPER(DATA_TYPE) \"DT\"\n"
-		}
-	} else if conn.Source.Driver == "postgres" || conn.Source.Driver == "pgx" {
-		if conn.Dest.Driver == "mssql" {
-			q += "-- pgsql to mssql\n"
-			q += "SELECT\n"
-			q += "'\"' || C.COLUMN_NAME || '\" ' ||\n"
-			q += "CASE UPPER(DATA_TYPE)\n"
-			q += "WHEN 'CHAR' THEN 'CHAR' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END \n"
-			q += "WHEN 'NCHAR' THEN 'CHAR' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END \n"
-			q += "WHEN 'VARCHAR' THEN 'VARCHAR' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END \n"
-			q += "WHEN 'NVARCHAR' THEN 'VARCHAR' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END \n"
-			q += "WHEN 'CHARACTER' THEN 'CHAR' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END \n"
-			q += "WHEN 'CHARACTER VARYING' THEN 'VARCHAR' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END \n"
-			q += "WHEN 'TINYINT' THEN 'TINYINT'\n"
-			q += "WHEN 'SMALLINT' THEN 'SMALLINT'\n"
-			q += "WHEN 'INT' THEN 'INT'\n"
-			q += "WHEN 'DECIMAL' THEN 'DECIMAL' || case when C.NUMERIC_PRECISION::character varying IS NULL THEN '' ELSE '(' || C.NUMERIC_PRECISION::character varying || ',' || C.NUMERIC_SCALE::character varying || ')' END\n"
-			q += "WHEN 'NUMERIC' THEN 'DECIMAL' || case when C.NUMERIC_PRECISION::character varying IS NULL THEN '' ELSE '(' || C.NUMERIC_PRECISION::character varying || ',' || C.NUMERIC_SCALE::character varying || ')' END\n"
-			q += "WHEN 'FLOAT' THEN 'FLOAT' || CASE WHEN C.NUMERIC_PRECISION < 53 THEN '(' || C.NUMERIC_PRECISION::character varying || ')' ELSE '' end\n"
-			q += "WHEN 'DOUBLE PRECISION' THEN 'FLOAT' || CASE WHEN C.NUMERIC_PRECISION < 53 THEN '(' || C.NUMERIC_PRECISION::character varying || ')' ELSE '' END\n"
-			q += "WHEN 'VARBINARY' THEN 'VARBINARY'\n"
-			q += "WHEN 'BYTEA' THEN 'VARBINARY'\n"
-			q += "WHEN 'DATETIME' THEN 'DATETIME'\n"
-			q += "ELSE DATA_TYPE\n"
-			q += "END || ' ' ||\n"
-			q += "CASE WHEN IS_NULLABLE = 'NO' THEN 'NOT NULL' ELSE '' END || ' ' ||\n"
-			q += "CASE WHEN C.COLUMN_DEFAULT IS NULL THEN ''\n"
-			q += "ELSE ' DEFAULT ' || case when POSITION('::' in C.COLUMN_DEFAULT) > 0 then SUBSTRING(C.COLUMN_DEFAULT,1,POSITION('::' in C.COLUMN_DEFAULT)-1) else C.COLUMN_DEFAULT END end\n"
-			q += "\"CL\", C.COLUMN_NAME \"CN\", UPPER(DATA_TYPE) \"DT\"\n"
-		} else if conn.Dest.Driver == "postgres" || conn.Dest.Driver == "pgx" {
-			q += "-- pgsql to pgsql\n"
-			q += "SELECT\n"
-			q += "'\"' || C.COLUMN_NAME || '\" ' ||\n"
-			q += "CASE UPPER(DATA_TYPE)\n"
-			q += "WHEN 'CHAR' THEN 'CHAR' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END \n"
-			q += "WHEN 'NCHAR' THEN 'CHAR' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END \n"
-			q += "WHEN 'VARCHAR' THEN 'VARCHAR' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END \n"
-			q += "WHEN 'NVARCHAR' THEN 'VARCHAR' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END \n"
-			q += "WHEN 'CHARACTER' THEN 'CHARACTER' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END \n"
-			q += "WHEN 'CHARACTER VARYING' THEN 'CHARACTER VARYING' || CASE WHEN C.CHARACTER_MAXIMUM_LENGTH::character varying IS NULL THEN '' ELSE '(' || C.CHARACTER_MAXIMUM_LENGTH::character varying || ')' END \n"
-			q += "WHEN 'TINYINT' THEN 'TINYINT'\n"
-			q += "WHEN 'SMALLINT' THEN 'SMALLINT'\n"
-			q += "WHEN 'INT' THEN 'INT'\n"
-			q += "WHEN 'DECIMAL' THEN 'DECIMAL' || case when C.NUMERIC_PRECISION::character varying IS NULL THEN '' ELSE '(' || C.NUMERIC_PRECISION::character varying || ',' || C.NUMERIC_SCALE::character varying || ')' END\n"
-			q += "WHEN 'NUMERIC' THEN 'NUMERIC' || case when C.NUMERIC_PRECISION::character varying IS NULL THEN '' ELSE '(' || C.NUMERIC_PRECISION::character varying || ',' || C.NUMERIC_SCALE::character varying || ')' END\n"
-			q += "WHEN 'FLOAT' THEN 'FLOAT' || CASE WHEN C.NUMERIC_PRECISION < 53 THEN '(' || C.NUMERIC_PRECISION::character varying || ')' ELSE '' END\n"
-			q += "WHEN 'VARBINARY' THEN 'VARBINARY'\n"
-			q += "WHEN 'DATETIME' THEN 'DATETIME'\n"
-			q += "ELSE DATA_TYPE\n"
-			q += "END || ' ' ||\n"
-			q += "CASE WHEN IS_NULLABLE = 'NO' THEN 'NOT NULL' ELSE '' END || ' ' ||\n"
-			q += "CASE WHEN C.COLUMN_DEFAULT IS NULL THEN ''\n"
-			q += "ELSE ' DEFAULT ' || C.COLUMN_DEFAULT END\n"
-			q += "\"CL\", C.COLUMN_NAME \"CN\", UPPER(DATA_TYPE) \"DT\"\n"
-		}
-	}
-
-	q += fmt.Sprintf("FROM %s.INFORMATION_SCHEMA.COLUMNS C\n", conn.Source.Database)
-	q += fmt.Sprintf("WHERE C.TABLE_CATALOG = '%s'\n", conn.Source.Database)
-	q += fmt.Sprintf("AND C.TABLE_SCHEMA = '%s'\n", conn.SSchema)
-	q += fmt.Sprintf("AND C.TABLE_NAME = '%s'\n", t)
-	q += "ORDER BY ORDINAL_POSITION;\n;"
-
-	if debug {
-		fmt.Println(q)
-	}
-	columnnames := []Column{}
-	if err := db.SelectContext(ctx, &columnnames, q); err != nil {
 		return nil, fmt.Errorf("select: %v", err)
 	}
 	return columnnames, nil
