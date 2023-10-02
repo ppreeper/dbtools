@@ -14,18 +14,8 @@ import (
 
 	"github.com/ppreeper/dbtools/pkg/configfile"
 	"github.com/ppreeper/dbtools/pkg/database"
-	"github.com/ppreeper/str"
-
-	// _ "github.com/denisenkom/go-mssqldb"
-	// _ "github.com/fajran/go-monetdb" //Monet
-	// _ "github.com/jmoiron/sqlx"
-	// _ "github.com/lib/pq"
-	// _ "github.com/mattn/go-sqlite3" //sqlite3
-	// _ "gopkg.in/mgo.v2" //Mongo
-	// _ "github.com/go-sql-driver/mysql/" //MySql
-	// _ "github.com/nakagami/firebirdsql" //Firebird Sql
-	// _ "bitbucket.org/phiggins/db2cli" //DB2
 	ec "github.com/ppreeper/dbtools/pkg/errcheck"
+	"github.com/ppreeper/str"
 )
 
 var logger *slog.Logger
