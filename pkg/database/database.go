@@ -6,7 +6,7 @@ import (
 	"time"
 
 	_ "github.com/denisenkom/go-mssqldb" //mssql driver
-	_ "github.com/jackc/pgx/v4/stdlib"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
 	ec "github.com/ppreeper/dbtools/pkg/errcheck"
 )

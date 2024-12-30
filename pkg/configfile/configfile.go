@@ -4,7 +4,7 @@ import (
 	"os"
 
 	ec "github.com/ppreeper/dbtools/pkg/errcheck"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 type Host struct {
