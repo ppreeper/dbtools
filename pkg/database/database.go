@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	_ "github.com/denisenkom/go-mssqldb" //mssql driver
+	_ "github.com/denisenkom/go-mssqldb" // mssql driver
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
 	ec "github.com/ppreeper/dbtools/pkg/errcheck"
@@ -29,12 +29,12 @@ type Database struct {
 }
 
 // Conn struct
-type Conn struct {
-	Source  *Database
-	Dest    *Database
-	SSchema string
-	DSchema string
-}
+// type Conn struct {
+// 	Source  *Database
+// 	Dest    *Database
+// 	SSchema string
+// 	DSchema string
+// }
 
 // OpenDatabase open database
 func OpenDatabase(db Database) (*Database, error) {
